@@ -1589,11 +1589,46 @@ showProcCar(false);
 function carMesh({g,tex}){g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
   const m=new T.Mesh(g,new T.MeshStandardMaterial({map:tex,roughness:0.55,metalness:0.15}));
   m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;return m;}
+// Saudi plate (2006 design, 335x155 mm): Arabic digits/letters on top, Latin below, digits left, letters right,
+// side strip with the emblem, السعودية, K S A and the category mark — blue strip with a down-pointing triangle
+function saudiPlate(){
+  const c=document.createElement('canvas');c.width=1340;c.height=620;const x=c.getContext('2d'),W=c.width,H=c.height;
+  const R=(a,b,w,h,r)=>{x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();};
+  x.fillStyle='#f7f7f4';R(6,6,W-12,H-12,46);x.fill();x.lineWidth=16;x.strokeStyle='#151515';x.stroke();
+  const SX=W-300;                                          // side strip on the right
+  x.save();R(6,6,W-12,H-12,46);x.clip();x.fillStyle='#1f5fae';x.fillRect(SX,0,W-SX,H);x.restore();
+  x.lineWidth=10;x.strokeStyle='#151515';x.beginPath();x.moveTo(SX,14);x.lineTo(SX,H-14);x.stroke();
+  // emblem: palm over two crossed swords (simplified)
+  const ex=SX+(W-SX)/2;x.strokeStyle='#fff';x.fillStyle='#fff';x.lineWidth=9;x.lineCap='round';
+  x.beginPath();x.moveTo(ex,150);x.lineTo(ex,60);x.stroke();
+  for(let i=0;i<7;i++){const a=-Math.PI/2+(i-3)*0.42;x.beginPath();x.moveTo(ex,66);x.quadraticCurveTo(ex+Math.cos(a)*34,66+Math.sin(a)*34-6,ex+Math.cos(a)*58,66+Math.sin(a)*58+10);x.stroke();}
+  x.lineWidth=8;[[-1],[1]].forEach(([d])=>{x.beginPath();x.moveTo(ex-d*62,150);x.quadraticCurveTo(ex,170,ex+d*62,118);x.stroke();});
+  x.font='bold 66px "Noto Naskh Arabic","Geeza Pro",Tahoma,sans-serif';x.textAlign='center';x.textBaseline='middle';x.direction='rtl';x.fillText('السعودية',ex,240);
+  x.direction='ltr';x.font='bold 74px Arial,Helvetica,sans-serif';['K','S','A'].forEach((ch,i)=>x.fillText(ch,ex,330+i*78));
+  x.beginPath();x.moveTo(ex-34,540);x.lineTo(ex+34,540);x.lineTo(ex,592);x.closePath();x.fill();   // commercial: down-pointing triangle
+  // main field: one horizontal and one vertical divider
+  x.strokeStyle='#151515';x.lineWidth=9;x.beginPath();x.moveTo(20,H/2);x.lineTo(SX,H/2);x.moveTo(SX/2,24);x.lineTo(SX/2,H-24);x.stroke();
+  x.fillStyle='#111';x.textAlign='center';x.textBaseline='middle';
+  x.font='bold 168px "Noto Naskh Arabic","Geeza Pro",Tahoma,sans-serif';x.direction='rtl';
+  x.fillText('٥٤٥٢',SX/4,H/4+14);x.fillText('ب ك ك',SX*3/4,H/4+10);
+  x.direction='ltr';x.font='bold 178px "DIN Alternate",Arial,Helvetica,sans-serif';
+  x.fillText('5452',SX/4,H*3/4+8);x.fillText('B K K',SX*3/4,H*3/4+8);
+  const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=8;return t;}
+let plates=null;
+function fitPlates(m){
+  const bb=m.userData.bb,k=m.userData.k,H2=(bb.max.y-bb.min.y)*k;
+  if(!plates){const tex=saudiPlate(),mat=new T.MeshStandardMaterial({map:tex,roughness:0.45,metalness:0.05});
+    plates=[0,1].map(i=>{const pl=new T.Mesh(new T.PlaneGeometry(0.335,0.155),mat);pl.renderOrder=1;pl.userData.keep=true;body.add(pl);return pl;});
+    plates[1].rotation.y=Math.PI;plates.forEach(pl=>pl.scale.setScalar(1.3));} // the model is scaled a bit larger than life, so the plate follows
+  plates[0].position.set(0,H2*PLATE.fy,CAR_LEN/2+PLATE.fz);   // front bumper
+  plates[1].position.set(0,H2*PLATE.ry,-CAR_LEN/2-PLATE.rz);  // tailgate / rear bumper
+}
+const PLATE={fy:0.255,fz:0.02,ry:0.33,rz:0.02};
 // two versions: the original model as sent (511k triangles, 2048 texture) for the title page only, the light one (25k) for driving
 const carModels={light:null,hq:null};
 function useCar(m){
   if(!m)return;[carModels.light,carModels.hq].forEach(o=>{if(o&&o!==m)o.visible=false;});m.visible=true;if(!m.parent)body.add(m);
-  body.children.forEach(o=>{if(o.isMesh&&o!==carModels.light&&o!==carModels.hq&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=false;});
+  body.children.forEach(o=>{if(o.isMesh&&!o.userData.keep&&o!==carModels.light&&o!==carModels.hq&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=false;});
   wheels.forEach(w=>w.w.visible=false);           // the model carries its own wheels
   const bb=m.userData.bb,k=m.userData.k,H2=(bb.max.y-bb.min.y)*k,W2=(bb.max.x-bb.min.x)*k;
   carLamps.tails.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.4,H2*0.58,-CAR_LEN/2-0.04));
@@ -1601,7 +1636,7 @@ function useCar(m){
   carLamps.heads.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.36,H2*0.53,CAR_LEN/2+0.05));
   carLamps.tailPool.position.z=-CAR_LEN/2-1.6;
   heads.forEach((l,i)=>l.position.set((i?1:-1)*W2*0.32,H2*0.52,CAR_LEN/2-0.1));
-  window.__carModel=m;}
+  fitPlates(m);window.__carModel=m;}
 // when the drive starts, swap the detailed car for the light one and free the detailed one
 function dropHQ(){const m=carModels.hq;if(!m)return;carModels.hq=null;if(carModels.light)useCar(carModels.light);
   body.remove(m);m.geometry.dispose();if(m.material.map)m.material.map.dispose();m.material.dispose();}
@@ -1646,7 +1681,7 @@ function frame(now){
 }
 // test hook: advance simulation deterministically without rAF timing
 window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
-window.__world={SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
+window.__world={PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
 window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
 })();
