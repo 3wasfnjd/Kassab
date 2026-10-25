@@ -711,7 +711,8 @@ if(AAok){
     put(st,'shaib',-11,3,{over:{seed:73,bisht:'brown',stoop:0.4},wander:14,herd:h,r:0.4});put(st,'donkey',-13,6,{over:{seed:206},wander:14,herd:h,r:0.7});}
   // -- caravan camp: Saudi desert caravan, water tanker, a herd of 50 white camels (wadh / maghateer) with two herders,
   //    a big SUV and a work pickup with a cage (generic library vehicles, no brands)
-  {const K=site('caravan'),WS=1.4,WD=-4.3*(WS-1);   // the camp's tanker is scaled up; WD shifts the hose/trough back to its new tailK.group.add(makeCaravan(K.x,K.z,0.35));
+  {const K=site('caravan'),WS=1.4,WD=-4.3*(WS-1);   // the camp's tanker is scaled up; WD shifts the hose/trough back to its new tail
+    K.group.add(makeCaravan(K.x,K.z,0.35));
     put(K,'wayt',-9,6,{rot:2.0,scale:WS,over:{seed:29,tank:'white'}});
     {const r=2.0,c=Math.cos(r),s=Math.sin(r),lp=(x,z)=>[K.x-9+x*c+z*s,K.z+6-x*s+z*c];   // tanker-local -> world (the tanker's rear valve sits at local (0.5,0.6,-4.15))
      const [tx,tz]=lp(0.2,-8.0+WD);K.group.add(makeTrough(tx,tz,r));   // trough lies across the tanker's tail
