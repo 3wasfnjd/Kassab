@@ -198,6 +198,11 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 'use strict';
 if(!window.THREE){const e=document.getElementById('err');e.hidden=false;e.textContent='تعذّر تحميل محرك العرض (lib/three.min.js). شغّل اللعبة من سيرفر أو من GitHub Pages.';return;}
 const T=THREE;
+// shadows only for the player's car and living things: anything else asking to cast a shadow is ignored,
+// so the shadow pass draws a handful of meshes instead of the whole world
+Object.defineProperty(T.Object3D.prototype,'castShadow',{configurable:true,
+  get(){return this._cs===true&&(this.isLight===true||this.isSkinnedMesh===true||(this.userData&&this.userData.sh===true));},
+  set(v){this._cs=!!v;}});
 T.ColorManagement.legacyMode=false;
 
 /* ---------------- constants ---------------- */
@@ -282,8 +287,8 @@ renderer.setPixelRatio(pixelRatio);
 renderer.outputEncoding=T.sRGBEncoding;
 renderer.toneMapping=T.ACESFilmicToneMapping;
 renderer.toneMappingExposure=0.84;
-renderer.shadowMap.enabled=false;   // shadows off for phone performance (the shadow pass re-draws every caster into a 2048 map each frame)
-renderer.shadowMap.type=T.PCFSoftShadowMap;
+renderer.shadowMap.enabled=true;   // only the car and people/animals cast (see the castShadow filter above)
+renderer.shadowMap.type=T.PCFShadowMap;
 renderer.setClearColor(new T.Color('#d9bc90'),1);
 
 const scene=new T.Scene();
@@ -296,8 +301,8 @@ const hemi=new T.HemisphereLight(0xdfe6ee,0x9a7048,0.42);scene.add(hemi);
 const sun=new T.DirectionalLight(0xffe9cc,3.3);
 const SUN_DIR=new T.Vector3(-0.55,0.62,-0.58).normalize();
 const envU={cloud:{value:0},time:{value:0},wet:{value:0}};
-sun.castShadow=false;
-sun.shadow.mapSize.set(2048,2048);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);
 const SC=sun.shadow.camera;SC.left=-48;SC.right=48;SC.top=48;SC.bottom=-48;SC.near=1;SC.far=260;
 sun.shadow.bias=-0.0004;sun.shadow.normalBias=0.06;
 scene.add(sun);scene.add(sun.target);
@@ -595,7 +600,7 @@ const body=new T.Group();car.add(body);
     part(new T.BoxGeometry(0.06,0.3,0.06),K,1.1,1.5,0.62),part(new T.BoxGeometry(0.06,0.3,0.06),K,-1.1,1.5,0.62),
     part(new T.BoxGeometry(0.05,0.36,0.05),'#d8dde0',0.96,1.62,-0.86),part(new T.BoxGeometry(0.05,0.36,0.05),'#d8dde0',-0.96,1.62,-0.86)
   ]);
-  const m=new T.Mesh(g,vcMat);m.castShadow=true;m.receiveShadow=true;body.add(m);
+  const m=new T.Mesh(g,vcMat);m.userData.sh=true;m.castShadow=true;m.receiveShadow=true;body.add(m);
   const plate=(x,w,h)=>{x.fillStyle='#f6f6f2';x.fillRect(0,0,w,h);x.strokeStyle='#222';x.lineWidth=6;x.strokeRect(3,3,w-6,h-6);
     x.fillStyle='#1a1a1a';x.font='bold 46px Tahoma,sans-serif';x.textAlign='center';x.textBaseline='middle';
     x.fillText('١٢٣٤',w*0.3,h*0.36);x.fillText('ع ب د',w*0.72,h*0.36);
@@ -612,7 +617,7 @@ const wheels=[];
   const wg=merge([part(new T.CylinderGeometry(0.47,0.47,0.38,16),'#1b1c1d',0,0,0,0,0,Math.PI/2),
                   part(new T.CylinderGeometry(0.29,0.29,0.39,10),'#b9bec2',0,0,0,0,0,Math.PI/2)]);
   [[0.92,1.75],[-0.92,1.75],[0.92,-1.85],[-0.92,-1.85]].forEach(([x,z],i)=>{
-    const piv=new T.Group();piv.position.set(x,0.47,z);const w=new T.Mesh(wg,vcMat);w.castShadow=true;piv.add(w);car.add(piv);
+    const piv=new T.Group();piv.position.set(x,0.47,z);const w=new T.Mesh(wg,vcMat);w.userData.sh=true;w.castShadow=true;piv.add(w);car.add(piv);
     wheels.push({piv,w,x,z,front:i<2,px:0,pz:0,has:false});
   });
 }
@@ -1746,7 +1751,7 @@ function showProcCar(v){body.children.forEach(o=>{if(o.isMesh&&o!==carLamps.tail
 showProcCar(false);
 function carMesh({g,tex}){g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
   const m=new T.Mesh(g,new T.MeshStandardMaterial({map:tex,roughness:0.55,metalness:0.15}));
-  m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;return m;}
+  m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.userData.sh=true;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;return m;}
 // Saudi plate (2006 design, 335x155 mm): Arabic digits/letters on top, Latin below, digits left, letters right,
 // side strip with the emblem, السعودية, K S A and the category mark — blue strip with a down-pointing triangle
 function saudiPlate(){
