@@ -1257,7 +1257,7 @@ function adapt(dt){fpsAcc+=dt;fpsN++;fpsT+=dt;if(fpsT<2.5)return;const fps=fpsN/
 
 /* ---------------- car radio: tap to switch station (off → 1 → 2 → 3 → 4 → off) ---------------- */
 const RADIO=['radio/1.mp3','radio/2.mp3','radio/3.mp3','radio/4.mp3'];
-const radioEl=document.getElementById('radio'),audio=new Audio();audio.preload='none';let station=0;
+const radioEl=document.getElementById('radio'),audio=new Audio();audio.preload='none';audio.volume=0.32;let station=0; // radio sits under the engine
 const AR=n=>String(n).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
 function tune(k){station=k;radioEl.classList.toggle('on',k>0);radioEl.textContent=k?'راديو '+AR(k):'راديو';
   if(!k){audio.pause();showToast('الراديو طافي',1.5);return;}
@@ -1267,12 +1267,61 @@ radioEl.addEventListener('click',()=>tune((station+1)%(RADIO.length+1)));
 audio.addEventListener('ended',()=>tune(station%RADIO.length+1));
 audio.addEventListener('error',()=>{if(station)showToast('الأغنية '+AR(station)+' ما انضافت بعد',2.5);});
 
+/* ---------------- engine + sand sounds (synthesised with Web Audio, no files) ---------------- */
+const snd={ctx:null};window.__snd=snd;
+function initSound(){
+  if(snd.ctx)return;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  const c=new AC(),out=c.createGain();out.gain.value=0.9;out.connect(c.destination);snd.ctx=c;snd.out=out;
+  // engine: two detuned saws + a sub square, soft-clipped, through a throttle-dependent low-pass
+  const eng=c.createGain();eng.gain.value=0;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=500;lp.Q.value=2.5;
+  const shp=c.createWaveShaper();const cv=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;cv[i]=Math.tanh(x*2.6);}shp.curve=cv;
+  const o1=c.createOscillator(),o2=c.createOscillator(),o3=c.createOscillator();o1.type='sawtooth';o2.type='sawtooth';o3.type='square';o2.detune.value=14;
+  const g1=c.createGain(),g2=c.createGain(),g3=c.createGain();g1.gain.value=0.45;g2.gain.value=0.3;g3.gain.value=0.35;
+  [[o1,g1],[o2,g2],[o3,g3]].forEach(([o,g])=>{o.connect(g);g.connect(shp);o.start();});
+  shp.connect(lp);lp.connect(eng);eng.connect(out);
+  // sand: looped noise, band-passed for the gritty spray of tyres digging in ("tat'ees"), plus a high hiss
+  const nb=c.createBuffer(1,c.sampleRate*2,c.sampleRate),nd=nb.getChannelData(0);let last=0;
+  for(let i=0;i<nd.length;i++){const w=Math.random()*2-1;last=last*0.6+w*0.4;nd[i]=(Math.random()<0.004?w*2.5:last);}
+  const ns=c.createBufferSource();ns.buffer=nb;ns.loop=true;ns.start();
+  const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=700;bp.Q.value=0.8;const sand=c.createGain();sand.gain.value=0;
+  const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=2500;const hiss=c.createGain();hiss.gain.value=0;
+  ns.connect(bp);bp.connect(sand);sand.connect(out);ns.connect(hp);hp.connect(hiss);hiss.connect(out);
+  Object.assign(snd,{eng,lp,o1,o2,o3,sand,bp,hiss,rpm:900,gear:1,wasAir:false});
+}
+['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,()=>{initSound();if(snd.ctx&&snd.ctx.state==='suspended')snd.ctx.resume();},{capture:true,passive:true}));
+document.addEventListener('visibilitychange',()=>{if(!snd.ctx)return;document.hidden?snd.ctx.suspend():snd.ctx.resume();});
+const GEARS=[0,9,17,25,33,99];
+function thump(k){if(!snd.ctx)return;const c=snd.ctx,t=c.currentTime,o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(90,t);o.frequency.exponentialRampToValueAtTime(35,t+0.25);
+  g.gain.setValueAtTime(0.5*k,t);g.gain.exponentialRampToValueAtTime(0.001,t+0.35);o.connect(g);g.connect(snd.out);o.start(t);o.stop(t+0.4);}
+function soundTick(dt){
+  if(!snd.ctx||snd.ctx.state!=='running')return;
+  const c=snd.ctx,t=c.currentTime,sp=Math.abs(S.vF||0),thr=input.gas?1:0;
+  // automatic gearbox; wheelspin and the handbrake let the revs flare
+  let g=1;while(g<GEARS.length-2&&sp>GEARS[g])g++;
+  if(g!==snd.gear){snd.gear=g;snd.shift=0.12;}
+  const lo=GEARS[g-1],hi=GEARS[g],within=Math.min(1,Math.max(0,(sp-lo)/(hi-lo)));
+  let target=900+within*4200*(g===1?1:0.85)+(g>1?900:0);
+  const spin=(S.air?1:0)+(input.hand&&thr?1:0)+Math.min(1,(S.slip||0)*0.06)*thr;
+  target+=spin*1800*thr;if(!thr)target=Math.max(900,target*0.75);
+  if(snd.shift>0){snd.shift-=dt;target*=0.8;}
+  snd.rpm+=(target-snd.rpm)*Math.min(1,dt*(thr?6:3));
+  const f=snd.rpm/30;snd.o1.frequency.setTargetAtTime(f,t,0.03);snd.o2.frequency.setTargetAtTime(f*1.003,t,0.03);snd.o3.frequency.setTargetAtTime(f*0.5,t,0.03);
+  snd.lp.frequency.setTargetAtTime(380+thr*1500+snd.rpm*0.18,t,0.05);
+  snd.eng.gain.setTargetAtTime(0.06+thr*0.07+Math.min(0.04,sp*0.001),t,0.06);
+  // sand spray: grows with slip (drifting, wheelspin) and a little with speed; silent in the air or in water
+  const onSand=!S.air&&!S.wet;const slipK=Math.min(1,(S.slip||0)*0.07);
+  const grit=onSand?Math.min(0.55,slipK*0.5+sp*0.004)*(0.75+0.5*Math.random()):0;
+  snd.sand.gain.setTargetAtTime(grit,t,0.04);snd.bp.frequency.setTargetAtTime(500+slipK*900+Math.random()*200,t,0.05);
+  snd.hiss.gain.setTargetAtTime(onSand?slipK*0.12:(S.wet&&sp>2?Math.min(0.25,sp*0.015):0),t,0.05);
+  if(snd.wasAir&&!S.air)thump(Math.min(1,0.3+Math.abs(S.vy||0)*0.05+0.4));snd.wasAir=S.air;
+}
+
 /* ---------------- loop ---------------- */
 let mapT=0,wT=0;
 function worldTick(dt,now){
   wT+=dt;
   updateChunks(S.x,S.z,1);recenterTrail(S.x,S.z);
-  envTick(dt);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}
+  soundTick(dt);envTick(dt);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}
   if(AAok){pumpQueue(queue.length>queueTotal*0.7?22:14);stepActors(dt);stepMovers(dt);stepTow(dt);AA.three.uniforms.uTime.value=wT;}
   mapT-=dt;if(mapT<=0){mapT=0.15;drawMap();}
 }
