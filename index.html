@@ -147,9 +147,11 @@ const SITES=[
   {id:'village',name:'الحي النجدي', x:430, z:-380, r0:46,r1:92, col:'#e0b07a'},
   {id:'oasis',  name:'الواحة',      x:-470,z:260,  r0:40,r1:84, col:'#7fa05a'},
   {id:'badia',  name:'بيت الشعر',   x:300, z:520,  r0:32,r1:70, col:'#3a2e28'},
-  {id:'camp',   name:'مخيم البدو',  x:-600,z:-520, r0:24,r1:56, col:'#c9a27a'}
+  {id:'camp',   name:'مخيم البدو',  x:-600,z:-520, r0:24,r1:56, col:'#c9a27a'},
+  {id:'souq',   name:'السوق',       x:483, z:-380, r0:34,r1:66, col:'#b5654a'}
 ];
 SITES.forEach(t=>t.h=base(t.x,t.z));
+SITES[5].h=SITES[1].h; // the souq shares the village's ground level so the two pads meet cleanly
 // places where the water tanker gets stuck: gentle sand pans so the player can stop next to it
 const SPOTS=[[70,-60,0.6],[-200,40,2.2],[150,300,-0.4],[-540,-150,1.4],[300,-200,2.8],[-90,420,0.2]];
 const PANS=SPOTS.map(p=>({x:p[0],z:p[1],r0:8,r1:26,h:base(p[0],p[1])}));
@@ -283,7 +285,7 @@ tMat.onBeforeCompile=(sh)=>{
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;')
     .replace('#include <begin_vertex>','#include <begin_vertex>\nvWP=(modelMatrix*vec4(transformed,1.0)).xyz;vWN=normalize(mat3(modelMatrix)*objectNormal);');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[13];uniform vec3 uSites[5];uniform float uCloud;uniform float uETime;uniform float uWet;uniform vec4 uWadi[6];uniform vec3 uLake;
+    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[13];uniform vec3 uSites[6];uniform float uCloud;uniform float uETime;uniform float uWet;uniform vec4 uWadi[6];uniform vec3 uLake;
     float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
       return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -300,7 +302,7 @@ tMat.onBeforeCompile=(sh)=>{
     diffuseColor.rgb*=0.96+0.06*fine;
     float rd2=1e9;for(int i=0;i<13;i++){vec4 r=uRoads[i];vec2 ab=r.zw-r.xy;float t=clamp(dot(vWP.xz-r.xy,ab)/dot(ab,ab),0.0,1.0);vec2 e=vWP.xz-r.xy-ab*t;rd2=min(rd2,dot(e,e));}
     float road=1.0-smoothstep(2.6,5.5,sqrt(rd2)+vn(vWP.xz*0.4)*1.5);
-    float pad=0.0;for(int i=0;i<5;i++){pad=max(pad,1.0-smoothstep(uSites[i].z*0.55,uSites[i].z*0.95,distance(vWP.xz,uSites[i].xy)+vn(vWP.xz*0.15)*6.0));}
+    float pad=0.0;for(int i=0;i<6;i++){pad=max(pad,1.0-smoothstep(uSites[i].z*0.55,uSites[i].z*0.95,distance(vWP.xz,uSites[i].xy)+vn(vWP.xz*0.15)*6.0));}
     float packed=max(road,pad*0.6);
     float rut=road*(0.5+0.5*sin(sqrt(rd2)*3.3));
     diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(0.86,0.8,0.74),packed*(0.55+0.25*rut));
@@ -590,9 +592,10 @@ if(AAok){
   const CA1={seed:14},CA2={seed:15,coat:'majaheem'},CA3={seed:16,coat:'humr'},CAS={seed:17,saddle:true,coat:'wadh'};
   const SP1={seed:200},SP2={seed:203,breed:'goat'};
   // -- herds roaming the dunes (closest to the start, built first)
-  [[150,250],[-260,-220],[640,110],[-120,560]].forEach(([hx,hz],k)=>{const st={x:hx,z:hz,group:SITES[0].group,id:'herd'};
-    [CA1,CA2,CA3,CA1].forEach((ov,i)=>put(st,'camel',(i-1.5)*5,(i%2)*4,{over:ov,wander:38,rot:k+i,r:1.1}));
-    put(st,'shaib',0,-6,{over:k%2?SH1:SH2,wander:20,r:0.4});});
+  const CA4={seed:18,coat:'sufr'},HERD=[CA1,CA2,CA3,CA4,CA1,CA3,CA2];
+  [[150,250],[-260,-220],[640,110],[-120,560],[250,-120],[-380,-40]].forEach(([hx,hz],k)=>{const st={x:hx,z:hz,group:scene,id:'herd'};
+    HERD.slice(0,6+(k%2)).forEach((ov,i)=>put(st,'camel',(i%3-1)*6+(k%2?2:0),Math.floor(i/3)*6-3,{over:ov,wander:42,rot:k+i,r:1.1}));
+    put(st,'shaib',-4,-10,{over:k%2?SH1:SH2,wander:26,r:0.4});put(st,'boy',5,9,{over:BOY,wander:26,r:0.4});});
   // -- Najdi village: walled quarter, mosque, well, palm orchard, coffee majlis
   const V=site('village');
   [[-21,H1],[-11.5,H2],[11.5,H3],[21,H2]].forEach(([x,ov])=>put(V,'najdi_house',x,-2.5-ov.depth/2,{over:ov}));
@@ -633,6 +636,8 @@ if(AAok){
   put(B,'khaima',15,-5,{rot:-0.6,over:{seed:26}});put(B,'khaima',-17,8,{rot:0.7,over:{seed:27,style:'box',size:3}});
   put(B,'firewood',-7.4,2.6,{rot:0.4,over:{seed:33,rows:4,length:1.4}});put(B,'zir',-6.8,-0.6,{over:{seed:35}});
   put(B,'talh',-21,-12,{over:{seed:36}});put(B,'talh',22,-11,{over:{seed:36}});
+  [[16,4,CA2],[18,10,CA3],[11,15,CA4],[-14,14,CA1],[-19,9,CA2],[21,-3,CA1]].forEach(([x,z,ov],i)=>put(B,'camel',x,z,{over:ov,wander:14,rot:i,r:1.1}));
+  [[-13.5,-5.4,SP2],[-11.2,-0.4,SP1],[-14.6,-1.6,SP2],[-10.8,-5,SP1],[-16,1.5,SP1],[-17.5,-2.5,SP2],[-15,3.5,SP1]].forEach(([x,z,ov],i)=>put(B,'sheep',x,z,{over:ov,rot:i*0.9,clip:i%3?'graze':'idle',r:0.35}));
   // -- small Bedouin camp
   const C=site('camp');
   put(C,'khaima',-4,-3,{rot:0.4,over:{seed:28,color:'beige',size:2.2}});put(C,'khaima',6,-5,{rot:-0.5,over:{seed:28,color:'beige',size:2.2}});
@@ -641,6 +646,64 @@ if(AAok){
   put(C,'badawiya',-8,6,{over:BW,walk:[-8,6,6,8]});
   [[10,8,CA1],[-10,10,CA3],[14,-2,CA2]].forEach(([x,z,ov],i)=>put(C,'camel',x,z,{over:ov,wander:16,rot:i,r:1.1}));
   put(C,'talh',-16,-12,{over:{seed:36}});
+  // -- souq: the gallery's souq layout, placed just outside the village's east gate
+  {const Q=site('souq');const L2W=(x0,z0,rot,lx,lz)=>[x0+lx*Math.cos(rot)+lz*Math.sin(rot),z0-lx*Math.sin(rot)+lz*Math.cos(rot)];
+    function souqList(){
+      // الشارع بين صفّي الدكاكين صافٍ بعرض ~4 م (من حافة المظلات): z بين −2.1 و +2.1
+      const PI = Math.PI;
+      const N = (x, w, over) => ({ x, z: -4.2, over: Object.assign({ width: w }, over) }), S2 = (x, w, over) => ({ x, z: 4.2, rot: PI, over: Object.assign({ width: w }, over) });
+      const kiosks = [N(-4.6, 2.6, { seed:4, goods:'dates', roof:'palm' }), N(-1.8, 2.6, { seed:5, goods:'spices', roof:'blue' }), N(1.0, 2.6, { seed:6, goods:'pottery', roof:'palm' }), N(3.8, 2.6, { seed:7, goods:'cloth', roof:'red' }),
+        S2(-8.6, 3.2, { seed:8, goods:'fruit', roof:'green' }), S2(-5.4, 2.6, { seed:9, goods:'brass', roof:'blue' }), S2(4.2, 2.6, { seed:10, goods:'dates', roof:'red' })];
+      // البائعون: خلف البسطة مباشرة
+      const sellerAt = k => { const [x, z] = L2W(k.x, k.z, k.rot || 0, 0, -0.3); return { x, z, rot: k.rot || 0 }; };
+      const sl = kiosks.map(sellerAt);
+      const shopsN = [{ x:-12.5, z:-4.9, over:{ seed:1, roof:'red', width:4 } }, { x:-8, z:-4.9, over:{ seed:2, roof:'palm', goods:'grain', width:4 } }, { x:8, z:-4.9, over:{ seed:3, roof:'green', width:5 } }, { x:12.53, z:-4.9, over:{ seed:11, roof:'red', width:4 } }];
+      const shopsS = [{ x:-12.5, z:4.9, rot:PI, over:{ seed:12, roof:'palm', width:4 } }, { x:8.2, z:4.9, rot:PI, over:{ seed:13, roof:'blue', goods:'grain', width:4 } }, { x:12.6, z:4.9, rot:PI, over:{ seed:14, roof:'green', goods:'none', width:4 } }];
+      const shopSit = (sh) => { const [x, z] = L2W(sh.x, sh.z, sh.rot || 0, 0, 2.1); return { x, z, rot: sh.rot || 0 }; };
+      const ss = [shopSit(shopsN[1]), shopSit(shopsS[0]), shopSit(shopsN[2])];
+      return [
+        { id:'shop',   inst: shopsN.concat(shopsS) },
+        { id:'kiosk',  inst: kiosks },
+        { id:'sur',    shared:true, lod:'low', inst:[{ x:-7.5, z:-7.1, rot:PI, over:{ seed:40, length:15, height:3.6, thickness:0.6, crenels:true, loopholes:false } }, { x:7.5, z:-7.1, rot:PI }, { x:-7.5, z:7.1, rot:0 }, { x:7.5, z:7.1, rot:0 }] },
+        { id:'sur',    shared:true, lod:'low', inst:[{ x:-15.8, z:-4.95, rot:-PI / 2, over:{ seed:41, length:4.5, height:3.6, thickness:0.6, loopholes:false } }, { x:-15.8, z:4.95, rot:-PI / 2 }] },
+        { id:'gate',   inst:[{ x:-15.8, z:0, rot:-PI / 2, over:{ seed:42, towers:false, height:4.6, gateWidth:3.4, open:1 } }] },
+        // ركن القهوة بين الأكشاك الجنوبية
+        { id:'majlis_seat', inst:[{ x:-0.6, z:6.15, rot:PI, over:{ seed:43, layout:'line', length:3.5 } }] },
+        { id:'fire_pit',    inst:[{ x:-0.6, z:4.45, over:{ seed:44, radius:0.34 } }] },
+        { id:'coffee_set',  inst:[{ x:0.9, z:4.9, rot:2.6, over:{ seed:45, dallahs:3, cups:8 } }] },
+        { id:'mabkhara',    inst:[{ x:-1.9, z:5.1, over:{ seed:46 } }] },
+        { id:'carpet',      inst: ss.map((p2, k) => ({ x: p2.x, z: p2.z, rot: p2.rot, over: { seed: 47 + k, length: 1.3, width: 0.8 } })) },
+        // فوانيس على أعمدة في الفراغات بين المظلات
+        { id:'lantern',     shared:true, inst:[{ x:-6.2, z:-2.35, rot:PI, over:{ seed:50, mount:'pole' } }, { x:5.75, z:-2.35, rot:PI }, { x:-3.85, z:2.35, rot:0 }, { x:6.05, z:2.35, rot:0 }] },
+        { id:'cart',   inst:[{ x:-20, z:0.6, walk:[-20, 0.6, 13, 0.6], over:{ seed:51, load:'sacks', animal:'donkey' } }, { x:19.6, z:2.1, rot:-1.75, over:{ seed:52, load:'dates', animal:'horse' } }, { x:17.4, z:-1.1, rot:1.5, over:{ seed:53, load:'crates' } }] },
+        { id:'sack',   inst:[{ x:5.95, z:-3.1, over:{ seed:63, goods:'coffee' } }, { x:6.3, z:-3.55, over:{ seed:64, goods:'cardamom' } }, { x:17.2, z:3.9, over:{ seed:65, open:false } }] },
+        { id:'crate',  inst:[{ x:16.9, z:-2.9, rot:0.6, over:{ seed:68, goods:'closed', stack:2 } }, { x:17.6, z:-3.2, rot:0.1, over:{ seed:69, goods:'oranges' } }] },
+        { id:'basket', inst:[{ x:-3.4, z:-2.45, over:{ seed:70, goods:'dates' } }, { x:-2.6, z:-2.45, over:{ seed:71, goods:'lemons', handles:false } }, { x:5.65, z:2.85, over:{ seed:72, shape:'tall', goods:'dates' } }, { x:2.6, z:-2.45, over:{ seed:73, goods:'empty' } }] },
+        { id:'pen',    inst:[{ x:22, z:-5.2, over:{ seed:75, width:7, depth:5 } }] },
+        { id:'sheep',  inst:[{ x:21.2, z:-5.6, rot:0.6, clip:'graze', over:{ seed:76 } }, { x:22.8, z:-4.5, rot:2.0, clip:'graze', over:{ seed:77, breed:'naimi' } }, { x:23.6, z:-6.2, rot:-1.2, over:{ seed:78, breed:'goat' } }, { x:20.4, z:-4.4, rot:-2.4, clip:'graze', over:{ seed:79 } }] },
+        { id:'camel',  inst:[{ x:22.8, z:3.8, rot:-1.4, over:{ seed:80, saddle:true } }, { x:25.8, z:1.2, rot:-2.0, clip:'graze', over:{ seed:81, coat:'humr' } }] },
+        { id:'horse',  inst:[{ x:25.4, z:5.2, rot:-2.6, over:{ seed:82 } }] },
+        { id:'pickup', inst:[{ x:28.6, z:-3.6, rot:-0.15, over:{ seed:83, load:'sheep', cage:true, dirt:0.55 } }] },
+        // البائعون والناس (المشاة على خطوط لا تتقاطع مع مسار العربة z≈0.6)
+        { id:'shaib',  inst:[sl[0], sl[1], sl[5]].map((p2, k) => Object.assign({}, p2, { over:{ seed:90 + k, bisht: k === 2 ? 'cream' : 'none', stoop: 0.5 } }))
+            .concat([{ x:ss[0].x, z:ss[0].z, y:0.05, rot:ss[0].rot, clip:'sit_floor', over:{ seed:93, bisht:'brown' } }, { x:ss[1].x, z:ss[1].z, y:0.05, rot:ss[1].rot, clip:'sit_floor', over:{ seed:94 } },
+              { x:-1.77, z:6.17, y:0.14, rot:PI, clip:'sit_floor', over:{ seed:95, bisht:'black', stoop:0.4 } }, { x:0.57, z:6.17, y:0.14, rot:PI, clip:'sit_floor', over:{ seed:96 } },
+              { x:-13, z:-1.25, walk:[-13, -1.25, 13, -1.25], over:{ seed:97 } }, { x:0.4, z:-2.55, rot:PI + 0.3, over:{ seed:98, bisht:'brown' } }]) },
+        { id:'woman',  inst:[Object.assign({}, sl[3], { over:{ seed:100 } }), { x:4.0, z:-2.3, rot:PI, over:{ seed:101 } }, { x:10, z:-0.55, walk:[10, -0.55, -10, -0.55], over:{ seed:102, veil:'niqab' } }, { x:-8.4, z:2.35, rot:0.2, over:{ seed:103, veil:'niqab' } }] },
+        { id:'boy',    inst:[Object.assign({}, sl[6], { over:{ seed:104, headwear:'ghutra', height:1.5 } }), { x:-0.6, z:6.17, y:0.14, rot:PI, clip:'sit_floor', over:{ seed:105, headwear:'shemagh', agal:true, height:1.5 } }, { x:-2.6, z:2.2, rot:0.2, clip:'wave', over:{ seed:106 } }] },
+        { id:'girl',   inst:[{ x:10.6, z:-1.85, walk:[10.6, -1.85, -9.4, -1.85], over:{ seed:107, dress:'purple' } }, { x:-7.7, z:2.3, rot:-0.4, over:{ seed:108, scarf:true } }] },
+        { id:'worker', inst:[Object.assign({}, sl[2], { over:{ seed:109, suit:'khaki', helmet:'none', tool:false, vest:false } }), Object.assign({}, sl[4], { over:{ seed:110, suit:'blue', helmet:'none', tool:false, vest:false, gloves:false } }), { x:16.3, z:-2.55, rot:0.6, clip:'work', over:{ seed:111, suit:'orange', helmet:'none', tool:false, vest:false } }] },
+        { id:'child',  inst:[{ x:-8.0, z:2.75, rot:0.6, over:{ seed:112 } }] },
+        { id:'palm',   lod:'low', inst:[{ x:-18, z:6.5, over:{ seed:113, height:8 } }, { x:16.5, z:-6.0, over:{ seed:114, height:10, lean:0.5 } }, { x:-18.5, z:-5.5, over:{ seed:115, height:7 } }] },
+        { id:'rocks',  shared:true, inst:[{ x:-21, z:3, over:{ seed:116, size:0.6 } }, { x:26.5, z:-9.5, rot:2 }] },
+        { id:'thumam', shared:true, inst:[{ x:-20, z:-2.5 }, { x:28, z:5.5, scale:0.7 }, { x:-19.5, z:9, scale:0.8 }] }
+      ];
+    }
+    for(const e of souqList()){if(!AA.assets[e.id])continue;const first=e.inst[0]&&e.inst[0].over;
+      for(const i of e.inst){const o={rot:i.rot||0,over:i.over||(e.shared?first:undefined),clip:i.clip,y:i.y,scale:i.scale};
+        if(i.walk&&e.id!=='cart')o.walk=i.walk;if(['lantern','carpet','sack','basket','coffee_set','fire_pit','mabkhara'].includes(e.id))o.nocol=true;
+        if(e.id==='lantern')o.over=Object.assign({mount:'pole'},o.over||{});
+        put(Q,e.id,i.x,i.z,o);}}}
   // acacia and sidr along the wadi banks
   {const rw=AAr(321);for(let i=1;i<14;i++){const t=i/14,dS=t*WLEN,g=WSEG.find(q=>dS<=q.s+q.L);const u=(dS-g.s)/g.L,x=g.a[0]+(g.b[0]-g.a[0])*u,z=g.a[1]+(g.b[1]-g.a[1])*u;
     const nx=-(g.b[1]-g.a[1])/g.L,nz=(g.b[0]-g.a[0])/g.L,sd=(rw()<0.5?-1:1)*(13+rw()*8);put({x:0,z:0,group:scene},rw()<0.6?'talh':'sidr',x+nx*sd,z+nz*sd,{over:{seed:i%3?36:132},rot:rw()*6});}}
@@ -884,7 +947,7 @@ function placeOnGround(g,x,z,h,len,sink){const hf=H(x+Math.sin(h)*len,z+Math.cos
 if(AAok){
   const V=site('village'),B=site('badia'),C=site('camp'),O=site('oasis'),ST=site('start');
   put(V,'pickup',-40,15,{rot:2.1,over:{seed:4,load:'sheep',cage:true,dirt:0.5}});put(V,'lorry',-42,-17,{rot:1.2,over:{seed:30,load:'hay',color:'blue'}});
-  put(B,'lorry',13,13.5,{rot:-2.5,over:{seed:30,load:'hay',color:'blue'}});put(B,'pickup',-1.2,13.8,{rot:3.4,over:{seed:31,load:'water',color:'white',rims:'steel',dirt:0.6}});
+  put(B,'lorry',13,13.5,{rot:-2.5,over:{seed:30,load:'hay',color:'blue'}});put(B,'wayt',-6.5,11,{rot:2.3,over:{seed:29}});put(B,'pickup',-1.2,13.8,{rot:3.4,over:{seed:31,load:'water',color:'white',rims:'steel',dirt:0.6}});
   put(B,'jeep',9,-9,{rot:-0.4,over:{seed:32,color:'white',rack:true,tire:1.1,dirt:0.6,rims:'steel',doors:0.8}});
   put(C,'jeep',-12,2,{rot:1.9,over:{seed:2,color:'white',rack:true,tire:1.12,dirt:0.6,rims:'steel'}});
   put(O,'pickup',16,8,{rot:-1.2,over:{seed:6,load:'crates',color:'champagne'}});
@@ -1352,7 +1415,14 @@ async function loadGLB(url){
   return{g,tex};
 }
 const CAR_LEN=5.5;
-loadGLB('models/car.glb').then(({g,tex})=>{
+// published page: geometry as JSON + JPEG texture (the host does not serve .glb); repo build: the .glb itself
+async function loadCarJSON(){
+  const j=await (await fetch('models/car.json')).json();const b64=(s,C)=>{const bin=atob(s),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new C(u.buffer);};
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(b64(j.pos,Float32Array),3));g.setAttribute('normal',new T.BufferAttribute(b64(j.nor,Float32Array),3));
+  g.setAttribute('uv',new T.BufferAttribute(b64(j.uv,Float32Array),2));g.setIndex(new T.BufferAttribute(b64(j.idx,j.idx32?Uint32Array:Uint16Array),1));
+  const img=await createImageBitmap(await (await fetch('models/car.jpg')).blob());const tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.anisotropy=4;tex.needsUpdate=true;
+  return{g,tex};}
+loadGLB('models/car.glb').catch(()=>loadCarJSON()).then(({g,tex})=>{
   g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
   const m=new T.Mesh(g,new T.MeshStandardMaterial({map:tex,roughness:0.55,metalness:0.15}));
   m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.castShadow=true;m.receiveShadow=true;
