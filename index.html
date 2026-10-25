@@ -223,7 +223,7 @@ function Hn(x,z,out){const e=0.6;const hx=(H(x+e,z)-H(x-e,z))/(2*e),hz=(H(x,z+e)
 /* ---------------- renderer / scene ---------------- */
 const canvas=document.getElementById('c');
 const renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-const PLAY_PR=Math.min(window.devicePixelRatio||1,1.5),TITLE_PR=Math.min(window.devicePixelRatio||1,2.5);
+const PLAY_PR=Math.min(window.devicePixelRatio||1,1.5),TITLE_PR=Math.min(window.devicePixelRatio||1,3);
 let pixelRatio=TITLE_PR;   // title page renders sharper; driving drops to PLAY_PR
 renderer.setPixelRatio(pixelRatio);
 renderer.outputEncoding=T.sRGBEncoding;
@@ -1614,13 +1614,14 @@ function saudiPlate(){
   x.fillText('٥٤٥٢',SX/4,H/4+14);x.fillText('ب ك ك',SX*3/4,H/4+10);
   x.direction='ltr';x.font='bold 178px "DIN Alternate",Arial,Helvetica,sans-serif';
   x.fillText('5452',SX/4,H*3/4+8);x.fillText('B K K',SX*3/4,H*3/4+8);
-  const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=renderer.capabilities.getMaxAnisotropy();return t;}
+  const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  t.onUpdate=null;return t;}
 let plates=null;
 function fitPlates(m){
   const bb=m.userData.bb,k=m.userData.k,H2=(bb.max.y-bb.min.y)*k;
-  if(!plates){const tex=saudiPlate(),mat=new T.MeshStandardMaterial({map:tex,roughness:0.45,metalness:0.05,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:0.18}); // faint self-light keeps it readable in the bumper's shade
+  if(!plates){const tex=saudiPlate(),mat=new T.MeshStandardMaterial({map:tex,roughness:0.45,metalness:0.05,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:0.32}); // faint self-light keeps it readable in the bumper's shade
     plates=[0,1].map(i=>{const pl=new T.Mesh(new T.PlaneGeometry(0.335,0.155),mat);pl.renderOrder=1;pl.userData.keep=true;body.add(pl);return pl;});
-    plates[1].rotation.y=Math.PI;plates.forEach(pl=>pl.scale.setScalar(1.3));} // the model is scaled a bit larger than life, so the plate follows
+    plates[1].rotation.y=Math.PI;plates.forEach(pl=>pl.scale.setScalar(1.55));} // the model is scaled a bit larger than life, so the plate follows
   plates[0].position.set(0,H2*PLATE.fy,CAR_LEN/2+PLATE.fz);   // front bumper
   plates[1].position.set(0,H2*PLATE.ry,-CAR_LEN/2-PLATE.rz);  // tailgate / rear bumper
 }
