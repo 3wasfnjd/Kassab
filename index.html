@@ -103,7 +103,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <div id="err" hidden></div>
 <div id="title">
   <h1>كسّاب</h1>
-  <p>هجولة في الطعوس</p>
+  <p>اهداء لصديقي ابوحصه 💕</p>
   <button id="start">ابدأ</button>
 </div>
 
@@ -788,7 +788,7 @@ function stepActors(dt){
   stepHerds(dt);
   for(const a of actors){
     if(a.hidden){a.g.visible=false;continue;}
-    const d2=(a.x-S.x)**2+(a.z-S.z)**2;a.g.visible=d2<260*260;if(!a.g.visible)continue;
+    const d2=(a.x-S.x)**2+(a.z-S.z)**2;a.g.visible=d2<260*260;if(!a.g.visible&&!a.roam)continue; // horsemen keep riding even far away
     let yOff=a.y0;
     if(a.state==='fly'){
       a.vy-=20*dt;a.x+=a.vx*dt;a.z+=a.vz*dt;a.yy+=a.vy*dt;a.tilt+=a.spin*dt;
@@ -1110,11 +1110,17 @@ function drawMap(){
   ROADP.forEach(pl=>{mctx.beginPath();pl.forEach(([x,z],i)=>{const [px,pz]=toP(x,z);i?mctx.lineTo(px,pz):mctx.moveTo(px,pz);});mctx.stroke();});
   SITES.forEach(t=>{const [px,pz]=toP(t.x,t.z);mctx.fillStyle=t.col;mctx.beginPath();mctx.arc(px,pz,mapBig?7:9,0,6.283);mctx.fill();
     mctx.lineWidth=2;mctx.strokeStyle='#fff';mctx.stroke();
-    if(mapBig){mctx.fillStyle='#2a2118';mctx.font='bold 15px "Baloo Bhaijaan 2",Tahoma,sans-serif';mctx.textAlign='center';mctx.fillText(t.name,px,pz-12);}});
+    if(mapBig){mctx.fillStyle='#2a2118';mctx.font='bold 15px "Baloo Bhaijaan 2",Tahoma,sans-serif';mctx.textAlign='center';mctx.fillText(t.name,px+(t.id==='souq'?26:t.id==='village'?-22:0),pz+(t.id==='souq'?20:-12));}});
   if(tow.g){const [tx,tz]=toP(tow.x,tow.z);mctx.fillStyle=tow.st==='stuck'||tow.st==='rope'?'#2f7fd1':'#7aa6cf';mctx.beginPath();mctx.arc(tx,tz,mapBig?6:8,0,6.283);mctx.fill();
     mctx.fillStyle='#fff';mctx.font='bold '+(mapBig?11:14)+'px Tahoma,sans-serif';mctx.textAlign='center';mctx.textBaseline='middle';mctx.fillText('!',tx,tz+1);mctx.textBaseline='alphabetic';
-    if(mapBig){mctx.fillStyle='#1d4f86';mctx.font='bold 14px "Baloo Bhaijaan 2",Tahoma,sans-serif';mctx.fillText('وايت مغرّز · فزعات '+tow.count.toLocaleString('ar-SA'),tx,tz-12);}}
+    if(mapBig){mctx.fillStyle='#1d4f86';mctx.font='bold 14px "Baloo Bhaijaan 2",Tahoma,sans-serif';mctx.textAlign='left';mctx.fillText('وايت · فزعات '+tow.count.toLocaleString('ar-SA'),tx+10,tz+22);mctx.textAlign='center';}}
+  // horsemen: small amber diamonds
+  actors.forEach(a=>{if(!a.sub)return;const [hx,hz]=toP(a.x,a.z),r=mapBig?5:6;mctx.fillStyle='#d9822b';mctx.strokeStyle='#fff';mctx.lineWidth=1.5;
+    mctx.beginPath();mctx.moveTo(hx,hz-r);mctx.lineTo(hx+r,hz);mctx.lineTo(hx,hz+r);mctx.lineTo(hx-r,hz);mctx.closePath();mctx.fill();mctx.stroke();
+});
   movers.forEach(m=>{if(m.x==null)return;const [mx,mz]=toP(m.x,m.z);mctx.fillStyle='#e9e1d0';mctx.beginPath();mctx.arc(mx,mz,mapBig?4:5,0,6.283);mctx.fill();});
+  if(mapBig){mctx.font='bold 12px "Baloo Bhaijaan 2",Tahoma,sans-serif';mctx.textAlign='right';mctx.fillStyle='#d9822b';mctx.fillRect(W-22,W-20,9,9);
+    mctx.fillStyle='#2a2118';mctx.fillText('خيّالة',W-28,W-12);}
   const [cx,cz]=toP(S.x,S.z);mctx.save();mctx.translate(cx,cz);mctx.rotate(-S.h+PI);
   mctx.fillStyle='#fff';mctx.strokeStyle='#2a2118';mctx.lineWidth=2;mctx.beginPath();mctx.moveTo(0,-12);mctx.lineTo(8,9);mctx.lineTo(0,5);mctx.lineTo(-8,9);mctx.closePath();mctx.fill();mctx.stroke();mctx.restore();
 }
