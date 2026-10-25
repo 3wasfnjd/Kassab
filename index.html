@@ -1420,7 +1420,7 @@ function updateVisual(dt){
       const r0=Math.hypot(tp.x-S.x,tp.z-S.z),r1=Math.hypot(camState.pos.x-S.x,camState.pos.z-S.z),a=a0+da*e,r=r0+(r1-r0)*e;
       camera.position.set(S.x+Math.sin(a)*r,tp.y+(camState.pos.y-tp.y)*e+Math.sin(k*Math.PI)*6,S.z+Math.cos(a)*r);
       camera.lookAt(_p.copy(tl).lerp(camState.look,e));
-      if(k>=1){game.mode='play';document.body.classList.remove('title','intro');}}
+      if(k>=1){game.mode='play';document.body.classList.remove('title','intro');dropHQ();}}
   }
   skyDome.position.copy(camera.position);
   // sun + shadow box follow car
@@ -1534,31 +1534,38 @@ async function loadGLB(url){
 }
 const CAR_LEN=5.5;
 // published page: geometry as JSON + JPEG texture (the host does not serve .glb); repo build: the .glb itself
-async function loadCarJSON(){
-  const j=await (await fetch('models/car.json')).json();const b64=(s,C)=>{const bin=atob(s),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new C(u.buffer);};
+async function loadCarJSON(name){
+  const j=await (await fetch('models/'+name+'.json')).json();const b64=(s,C)=>{const bin=atob(s),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new C(u.buffer);};
   const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(b64(j.pos,Float32Array),3));g.setAttribute('normal',new T.BufferAttribute(b64(j.nor,Float32Array),3));
   g.setAttribute('uv',new T.BufferAttribute(b64(j.uv,Float32Array),2));g.setIndex(new T.BufferAttribute(b64(j.idx,j.idx32?Uint32Array:Uint16Array),1));
-  const img=await createImageBitmap(await (await fetch('models/car.jpg')).blob());const tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.anisotropy=4;tex.needsUpdate=true;
+  const img=await createImageBitmap(await (await fetch('models/'+name+'.jpg')).blob());const tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.anisotropy=4;tex.needsUpdate=true;
   return{g,tex};}
+const loadCar=name=>loadGLB('models/'+name+'.glb').catch(()=>loadCarJSON(name));
 function showProcCar(v){body.children.forEach(o=>{if(o.isMesh&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=v;});wheels.forEach(w=>w.w.visible=v);}
 showProcCar(false);
-loadGLB('models/car.glb').catch(()=>loadCarJSON()).then(({g,tex})=>{
-  g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
+function carMesh({g,tex}){g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
   const m=new T.Mesh(g,new T.MeshStandardMaterial({map:tex,roughness:0.55,metalness:0.15}));
-  m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.castShadow=true;m.receiveShadow=true;
-  body.children.forEach(o=>{if(o.isMesh&&o!==carLamps.tailPool&&o!==carLamps.headPool&&o.material!==lampMat&&o.material!==tailMat)o.visible=false;});
-  body.children.forEach(o=>{if(o.material===lampMat||o.material===tailMat)o.visible=false;});
+  m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;return m;}
+// two versions: the detailed one (128k triangles, 2048 texture) for the title close-up, the light one (25k) for driving
+const carModels={light:null,hq:null};
+function useCar(m){
+  if(!m)return;[carModels.light,carModels.hq].forEach(o=>{if(o&&o!==m)o.visible=false;});m.visible=true;if(!m.parent)body.add(m);
+  body.children.forEach(o=>{if(o.isMesh&&o!==carModels.light&&o!==carModels.hq&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=false;});
   wheels.forEach(w=>w.w.visible=false);           // the model carries its own wheels
-  body.add(m);
-  // move the glow sprites onto the model's lamps
-  const H2=(bb.max.y-bb.min.y)*k,W2=(bb.max.x-bb.min.x)*k;
+  const bb=m.userData.bb,k=m.userData.k,H2=(bb.max.y-bb.min.y)*k,W2=(bb.max.x-bb.min.x)*k;
   carLamps.tails.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.4,H2*0.58,-CAR_LEN/2-0.04));
   carLamps.rev.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.3,H2*0.58,-CAR_LEN/2-0.04));
   carLamps.heads.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.36,H2*0.53,CAR_LEN/2+0.05));
   carLamps.tailPool.position.z=-CAR_LEN/2-1.6;
   heads.forEach((l,i)=>l.position.set((i?1:-1)*W2*0.32,H2*0.52,CAR_LEN/2-0.1));
-  window.__carModel=m;
-}).catch(e=>{console.warn('car model',e);showProcCar(true);});
+  window.__carModel=m;}
+// when the drive starts, swap the detailed car for the light one and free the detailed one
+function dropHQ(){const m=carModels.hq;if(!m)return;carModels.hq=null;if(carModels.light)useCar(carModels.light);
+  body.remove(m);m.geometry.dispose();if(m.material.map)m.material.map.dispose();m.material.dispose();}
+loadCar('car').then(d=>{carModels.light=carMesh(d);if(!carModels.hq||game.mode==='play')useCar(carModels.light);else{carModels.light.visible=false;body.add(carModels.light);}})
+  .catch(e=>{console.warn('car model',e);if(!carModels.hq)showProcCar(true);});
+loadCar('car_hq').then(d=>{if(game.mode==='play'){d.g.dispose();return;}carModels.hq=carMesh(d);carModels.hq.material.map.anisotropy=8;useCar(carModels.hq);})
+  .catch(e=>console.warn('hq car',e));
 
 /* ---------------- loop ---------------- */
 let mapT=0,wT=0;
