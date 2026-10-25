@@ -55,11 +55,12 @@ body.title .brand{width:84px}
 #knobBase::before{left:10px;border-right-color:rgba(255,240,215,.7)}
 #knobBase::after{right:10px;border-left-color:rgba(255,240,215,.7)}
 .pads{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));
-  display:grid;grid-template-columns:auto;grid-template-rows:auto;gap:12px;align-items:end}
+  display:grid;grid-template-columns:auto auto;grid-template-rows:auto;gap:12px;align-items:end}
 .btn{border-radius:50%;border:1.5px solid var(--rim);background:var(--glass);color:#fff;font:800 14px var(--font);
   display:grid;place-items:center;padding:0;touch-action:none}
 .btn.on{background:var(--glass-hi);border-color:var(--accent);color:var(--accent)}
-#gas{width:96px;height:96px;grid-column:1;grid-row:1;font-size:17px}
+#gas{width:96px;height:96px;grid-column:2;grid-row:1;font-size:17px}
+#brake{width:66px;height:66px;grid-column:1;grid-row:1}
 #rot{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));top:calc(166px + env(safe-area-inset-top,0px));width:40px;height:40px;
   display:grid;place-items:center;border-radius:12px;background:var(--glass-hi);border:1.5px solid var(--rim);color:#fff;pointer-events:none}
 #rot svg{animation:tilt 2.4s ease-in-out infinite;transform-origin:50% 50%}
@@ -126,6 +127,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 </div>
 <div id="steer"><div id="knobBase"><div id="knob"></div></div></div>
 <div class="pads">
+  <button class="btn" id="brake">فرامل</button>
   <button class="btn" id="gas">بنزين</button>
 </div>
 <canvas id="map" width="240" height="240" aria-label="الخريطة"></canvas>
@@ -1350,7 +1352,7 @@ steerEl.addEventListener('pointermove',e=>{if(e.pointerId!==touchSteer.id)return
 const endSteer=e=>{if(e.pointerId!==touchSteer.id)return;touchSteer.id=null;touchSteer.val=0;knob.style.transform='';};
 steerEl.addEventListener('pointerup',endSteer);steerEl.addEventListener('pointercancel',endSteer);
 const held={gas:false,brake:false,hand:false};
-['gas'].forEach(k=>{const el=document.getElementById(k);
+['gas','brake'].forEach(k=>{const el=document.getElementById(k);
   el.addEventListener('pointerdown',e=>{held[k]=true;el.classList.add('on');el.setPointerCapture(e.pointerId);e.preventDefault();});
   const up=()=>{held[k]=false;el.classList.remove('on');};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('lostpointercapture',up);});
 const keys={};
