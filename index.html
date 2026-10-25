@@ -1610,12 +1610,14 @@ function adapt(dt){fpsAcc+=dt;fpsN++;fpsT+=dt;if(fpsT<2.5)return;const fps=fpsN/
 const RADIO=['radio/1.mp3','radio/2.mp3','radio/3.mp3','radio/4.mp3'];
 const radioEl=document.getElementById('radio'),audio=new Audio();audio.preload='none';audio.volume=0.32;let station=0; // radio sits under the engine
 const AR=n=>String(n).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);
-function tune(k){station=k;radioEl.classList.toggle('on',k>0);radioEl.textContent=k?'راديو '+AR(k):'راديو';
-  if(!k){audio.pause();showToast('الراديو طافي',1.5);return;}
-  audio.src=RADIO[k-1];audio.currentTime=0;const pr=audio.play();showToast('الأغنية '+AR(k),1.8);
+// one button: tap to play, tap again to stop; songs follow one another on their own; no on-screen messages
+let lastSong=0;
+function tune(k){station=k;radioEl.classList.toggle('on',k>0);radioEl.textContent='راديو';
+  if(!k){audio.pause();return;}
+  lastSong=k;audio.src=RADIO[k-1];audio.currentTime=0;const pr=audio.play();
   if(pr&&pr.catch)pr.catch(()=>{});}
-radioEl.addEventListener('click',()=>tune((station+1)%(RADIO.length+1)));
-audio.addEventListener('ended',()=>tune(station%RADIO.length+1));
+radioEl.addEventListener('click',()=>tune(station?0:lastSong%RADIO.length+1));
+audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
 // weather panel: a small icon opens it; weather and time of day can be pinned or left automatic
 {const btn=document.getElementById('wxBtn'),pan=document.getElementById('wxPanel'),wxRow=document.getElementById('wxRow'),dayRow=document.getElementById('dayRow');
   const open=v=>{pan.hidden=!v;btn.classList.toggle('on',v);};
@@ -1629,7 +1631,7 @@ audio.addEventListener('ended',()=>tune(station%RADIO.length+1));
     else{env.lock=k;env.wx=k;showToast(k==='rain'?'مطر — راقب الوادي':WX_NAME[k],1.5);}});
   dayRow.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.day;mark(dayRow,b);
     env.dayLock=k==='auto'?null:+k;showToast(k==='auto'?'الوقت يمشي':b.lastChild.textContent.trim(),1.5);});}
-audio.addEventListener('error',()=>{if(station)showToast('الأغنية '+AR(station)+' ما انضافت بعد',2.5);});
+audio.addEventListener('error',()=>{});
 
 /* ---------------- engine + sand sounds (synthesised with Web Audio, no files) ---------------- */
 const snd={ctx:null};window.__snd=snd;
