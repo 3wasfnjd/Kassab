@@ -181,7 +181,8 @@ const SITES=[
   {id:'oasis',  name:'الواحة',      x:-470,z:260,  r0:40,r1:84, col:'#7fa05a'},
   {id:'badia',  name:'بيت الشعر',   x:300, z:520,  r0:32,r1:70, col:'#3a2e28'},
   {id:'camp',   name:'مخيم البدو',  x:-600,z:-520, r0:24,r1:56, col:'#c9a27a'},
-  {id:'souq',   name:'السوق',       x:483, z:-380, r0:34,r1:66, col:'#b5654a'}
+  {id:'souq',   name:'السوق',       x:483, z:-380, r0:34,r1:66, col:'#b5654a'},
+  {id:'caravan',name:'الكرفان',     x:60,  z:-300, r0:30,r1:62, col:'#f3f1ea'}
 ];
 SITES.forEach(t=>t.h=base(t.x,t.z));
 SITES[5].h=SITES[1].h; // the souq shares the village's ground level so the two pads meet cleanly
@@ -319,7 +320,7 @@ tMat.onBeforeCompile=(sh)=>{
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;')
     .replace('#include <begin_vertex>','#include <begin_vertex>\nvWP=(modelMatrix*vec4(transformed,1.0)).xyz;vWN=normalize(mat3(modelMatrix)*objectNormal);');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[13];uniform vec3 uSites[6];uniform float uCloud;uniform float uETime;uniform float uWet;uniform vec4 uWadi[6];uniform vec3 uLake;
+    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[13];uniform vec3 uSites[7];uniform float uCloud;uniform float uETime;uniform float uWet;uniform vec4 uWadi[6];uniform vec3 uLake;
     float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
       return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -336,7 +337,7 @@ tMat.onBeforeCompile=(sh)=>{
     diffuseColor.rgb*=0.96+0.06*fine;
     float rd2=1e9;for(int i=0;i<13;i++){vec4 r=uRoads[i];vec2 ab=r.zw-r.xy;float t=clamp(dot(vWP.xz-r.xy,ab)/dot(ab,ab),0.0,1.0);vec2 e=vWP.xz-r.xy-ab*t;rd2=min(rd2,dot(e,e));}
     float road=1.0-smoothstep(2.6,5.5,sqrt(rd2)+vn(vWP.xz*0.4)*1.5);
-    float pad=0.0;for(int i=0;i<6;i++){pad=max(pad,1.0-smoothstep(uSites[i].z*0.55,uSites[i].z*0.95,distance(vWP.xz,uSites[i].xy)+vn(vWP.xz*0.15)*6.0));}
+    float pad=0.0;for(int i=0;i<7;i++){pad=max(pad,1.0-smoothstep(uSites[i].z*0.55,uSites[i].z*0.95,distance(vWP.xz,uSites[i].xy)+vn(vWP.xz*0.15)*6.0));}
     float packed=max(road,pad*0.6);
     float rut=road*(0.5+0.5*sin(sqrt(rd2)*3.3));
     diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(0.86,0.8,0.74),packed*(0.55+0.25*rut));
@@ -423,6 +424,51 @@ const skyDome=new T.Mesh(new T.SphereGeometry(1400,32,16),new T.ShaderMaterial({
   vertexShader:`varying vec3 vD;void main(){vD=normalize(position);vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.0);gl_Position=p.xyww;}`,
   fragmentShader:`uniform vec3 hor;uniform vec3 zen;varying vec3 vD;void main(){float t=smoothstep(-0.02,0.45,vD.y);gl_FragColor=vec4(mix(hor,zen,t),1.0);}`}));
 skyDome.renderOrder=-10;skyDome.frustumCulled=false;scene.add(skyDome);
+
+/* ---------------- Saudi desert caravan (built in code from a reference photo) ---------------- */
+function caravanDecal(){ // navy palm-and-swords emblem on a transparent canvas
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.strokeStyle=x.fillStyle='#1c2a4a';x.lineCap='round';
+  x.lineWidth=16;x.beginPath();x.moveTo(128,150);x.lineTo(128,62);x.stroke();
+  for(let i=0;i<7;i++){const a=-Math.PI/2+(i-3)*0.44;x.lineWidth=14;x.beginPath();x.moveTo(128,66);x.quadraticCurveTo(128+Math.cos(a)*40,66+Math.sin(a)*40-8,128+Math.cos(a)*70,66+Math.sin(a)*70+14);x.stroke();}
+  x.lineWidth=14;[-1,1].forEach(d=>{x.beginPath();x.moveTo(128-d*78,206);x.quadraticCurveTo(128,214,128+d*70,150);x.stroke();});
+  const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;return t;}
+function makeCaravan(x0,z0,rot){
+  const g=new T.Group(),white=new T.MeshStandardMaterial({color:0xf3f2ee,roughness:0.55}),navy=new T.MeshStandardMaterial({color:0x1c2a4a,roughness:0.5}),
+    dark=new T.MeshStandardMaterial({color:0x1b1c1e,roughness:0.8}),glass=new T.MeshStandardMaterial({color:0x2a3138,roughness:0.15,metalness:0.3}),
+    shutter=new T.MeshStandardMaterial({color:0xdcdcd6,roughness:0.6}),steel=new T.MeshStandardMaterial({color:0x8d9296,roughness:0.4,metalness:0.6});
+  const L0=-6.2,L1=5.3,F=6.3,Y0=1.15,Y1=3.8,W=2.9;
+  // body: side profile with the raked front, extruded across the width
+  const sh=new T.Shape();sh.moveTo(L0,Y0);sh.lineTo(L1,Y0);sh.lineTo(F,2.95);sh.lineTo(F,Y1);sh.lineTo(L0,Y1);sh.closePath();
+  const bg=new T.ExtrudeGeometry(sh,{depth:W,bevelEnabled:false});bg.translate(0,0,-W/2);bg.rotateY(-Math.PI/2);   // profile x -> world z
+  const bodyM=new T.Mesh(bg,white);g.add(bodyM);
+  const box=(w,h,d,m,x,y,z,ry,rz)=>{const b=new T.Mesh(new T.BoxGeometry(w,h,d),m);b.position.set(x,y,z);if(ry)b.rotation.y=ry;if(rz)b.rotation.z=rz;g.add(b);return b;};
+  [-1,1].forEach(sd=>{const sx=sd*(W/2+0.012);
+    // twin navy stripes along the side, sweeping up at the front
+    [1.78,1.92].forEach((y,i)=>{const e=3.5-i*0.15;box(0.02,0.06,e+6.2,navy,sx,y,(e-6.2)/2);const sw=box(0.02,0.06,2.1,navy,sx,y+0.43,e+0.95);sw.rotation.x=-0.42;});
+    // windows with roller shutters
+    [-3.6,-1.4].forEach(z=>{box(0.06,0.95,1.05,white,sd*(W/2+0.03),2.75,z);box(0.04,0.55,0.85,glass,sd*(W/2+0.05),2.55,z);box(0.05,0.32,0.85,shutter,sd*(W/2+0.06),2.98,z);});
+    // marker lights along the roof edge
+    for(let k=0;k<8;k++){const m=new T.Mesh(new T.SphereGeometry(0.07,8,6),new T.MeshStandardMaterial({color:0xe9e3c9,emissive:0xffd9a0,emissiveIntensity:0.15}));m.position.set(sd*(W/2+0.02),3.6,-5.6+k*1.45);g.add(m);}
+    // emblem near the front
+    const em=new T.Mesh(new T.PlaneGeometry(1.15,1.15),new T.MeshStandardMaterial({map:caravanDecal(),transparent:true,roughness:0.6}));
+    em.position.set(sd*(W/2+0.03),2.75,4.3);em.rotation.y=sd*Math.PI/2;g.add(em);
+  });
+  // door with steps on the right, near the rear
+  box(0.05,2.0,0.95,white,W/2+0.04,2.25,-5.0);box(0.06,1.9,0.04,dark,W/2+0.06,2.25,-4.53);box(0.06,0.04,0.95,dark,W/2+0.06,3.24,-5.0);
+  [0,1,2].forEach(k=>box(0.35,0.06,0.9,steel,W/2+0.25+k*0.18,1.0-k*0.3,-5.0));
+  // red corner lights on the front
+  [-1,1].forEach(sd=>{const m=new T.Mesh(new T.SphereGeometry(0.08,8,6),new T.MeshStandardMaterial({color:0xb3261e,emissive:0xff2a1a,emissiveIntensity:0.4}));m.position.set(sd*1.25,3.88,6.2);g.add(m);});
+  // chassis, drawbar and wheels (single front axle on a turntable, twin rear axles)
+  box(0.18,0.22,12.4,dark,0.85,1.0,-0.4);box(0.18,0.22,12.4,dark,-0.85,1.0,-0.4);
+  [[0.9,0.25],[-0.9,-0.25]].forEach(([dx,ry])=>{const b=box(0.12,0.12,2.6,dark,dx*0.5,0.85,7.3);b.rotation.y=ry;});
+  box(0.25,0.18,0.35,steel,0,0.82,8.55);
+  const wg=new T.CylinderGeometry(0.52,0.52,0.36,18);wg.rotateZ(Math.PI/2);const rim=new T.CylinderGeometry(0.28,0.28,0.37,12);rim.rotateZ(Math.PI/2);
+  [[4.4],[-3.6],[-4.8]].forEach(([z])=>[-1,1].forEach(sd=>{const w=new T.Mesh(wg,dark);w.position.set(sd*1.08,0.52,z);g.add(w);const r=new T.Mesh(rim,steel);r.position.copy(w.position);g.add(r);}));
+  box(2.0,0.12,0.12,dark,0,0.52,4.4);box(2.0,0.12,0.12,dark,0,0.52,-3.6);box(2.0,0.12,0.12,dark,0,0.52,-4.8);
+  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+  g.position.set(x0,H(x0,z0)-0.02,z0);g.rotation.y=rot;
+  staticB.push({x:x0,z:z0,hx:1.6,hz:6.4,c:Math.cos(rot),s:Math.sin(rot)});
+  return g;}
 
 /* ---------------- geometry helpers ---------------- */
 function colored(geo,hex){geo=geo.index?geo.toNonIndexed():geo;const c=new T.Color(hex);const n=geo.attributes.position.count;
@@ -654,6 +700,19 @@ if(AAok){
     const fl=AAr(77),looks=[SP1,SP2,{seed:201,breed:'naimi'},{seed:204,size:0.7}];
     for(let i=0;i<30;i++){const a=fl()*6.283,r=2+fl()*9;put(st,'sheep',Math.cos(a)*r,Math.sin(a)*r,{over:looks[i%4],wander:9,herd:h,rot:fl()*6,r:0.35});}
     put(st,'shaib',-11,3,{over:{seed:73,bisht:'brown',stoop:0.4},wander:14,herd:h,r:0.4});put(st,'donkey',-13,6,{over:{seed:206},wander:14,herd:h,r:0.7});}
+  // -- caravan camp: Saudi desert caravan, water tanker, a herd of 50 white camels (wadh / maghateer) with two herders,
+  //    a big SUV and a work pickup with a cage (generic library vehicles, no brands)
+  {const K=site('caravan');K.group.add(makeCaravan(K.x,K.z,0.35));
+    put(K,'wayt',-9,6,{rot:2.0,over:{seed:29,tank:'white'}});
+    put(K,'jeep',9,9,{rot:-2.6,over:{seed:610,color:'white',rack:false,tire:1.12,rims:'silver',dirt:0.15,snorkel:false,stripe:false,bumper:'chrome'}});
+    put(K,'pickup',13,1,{rot:-1.9,over:{seed:611,color:'white',cage:true,load:'none',rims:'steel',dirt:0.4}});
+    put(K,'carpet',-3,-7,{rot:0.4,over:{seed:612,length:3,width:2},nocol:true});put(K,'fire_pit',-3,-7,{over:{seed:613},nocol:true});
+    put(K,'coffee_set',-1.6,-6.2,{rot:0.6,over:{seed:614,dallahs:2,cups:6},nocol:true});
+    put(K,'shaib',-4.4,-7.6,{over:SH2,y:0.05,clip:'sit_floor',rot:0.5});put(K,'shaib',-1.8,-8.2,{over:SH1,y:0.05,clip:'sit_floor',rot:-0.2});
+    const hx=K.x+40,hz=K.z+30,h={hx,hz,cx:hx,cz:hz,tx:hx,tz:hz,speed:0.5,range:70,pause:4};HERDS.push(h);const hs={x:hx,z:hz,group:scene,id:'wadh'};
+    const wr=AAr(55),W1={seed:620,coat:'wadh'},W2={seed:621,coat:'wadh',size:0.92},W3={seed:622,coat:'wadh',size:1.06};
+    for(let i=0;i<50;i++){const a=wr()*6.283,r=3+wr()*16;put(hs,'camel',Math.cos(a)*r,Math.sin(a)*r,{over:[W1,W2,W3][i%3],wander:16,herd:h,rot:wr()*6,r:1.1});}
+    put(hs,'shaib',-18,4,{over:{seed:623,bisht:'brown'},wander:20,herd:h,r:0.4});put(hs,'boy',16,-6,{over:{seed:624,headwear:'shemagh',agal:true},wander:20,herd:h,r:0.4});}
   // -- five horsemen roaming the open desert
   [[0,300,'bay'],[-320,-300,'grey'],[520,40,'black'],[-480,520,'chestnut'],[220,-520,'bay']].forEach(([x,z,coat],i)=>
     put({x,z,group:scene,id:'riders'},'horse',0,0,{over:{seed:400+i,coat},rider:i%2?SH1:{seed:410+i,bisht:i%3?'black':'cream'},wander:220,roam:true,pace:2.2,rot:i,r:0.9}));
