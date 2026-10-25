@@ -20,13 +20,18 @@ html,body{height:100%;margin:0;overflow:hidden;position:fixed;inset:0;-webkit-ta
 #c{position:fixed;inset:0;width:100%;height:100%;display:block}
 #vig{position:fixed;inset:0;pointer-events:none;
   background:radial-gradient(120% 90% at 50% 45%,rgba(0,0,0,0) 55%,rgba(60,38,15,.28) 100%)}
-.hud{position:fixed;top:calc(4px + env(safe-area-inset-top,0px));left:calc(14px + env(safe-area-inset-left,0px));width:110px;
-  display:flex;flex-direction:column;align-items:center;gap:0;pointer-events:none;color:rgba(232,255,240,.9);
-  text-shadow:0 0 1px rgba(255,255,255,.9),0 0 7px rgba(140,255,190,.6),0 1px 3px rgba(10,40,25,.55),0 0 14px rgba(20,60,40,.25)}
-.hud .drift{display:flex;align-items:center;gap:3px;height:14px;filter:drop-shadow(0 1px 1.5px rgba(10,40,25,.6));font:600 11px/1 "Segoe UI",Roboto,system-ui,sans-serif;color:#7dff9a;opacity:.25;transition:opacity .2s}
-.hud .drift.on{opacity:.95}
-.hud b{font:300 40px/0.95 "Segoe UI",Roboto,"Helvetica Neue",system-ui,sans-serif;letter-spacing:1px;font-variant-numeric:tabular-nums}
-.hud span{font:400 11px/1.1 var(--font);opacity:.8;letter-spacing:.5px}
+.hud{position:fixed;top:calc(4px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));width:236px;height:104px;pointer-events:none;
+  color:rgba(236,255,244,.92);font-family:"Segoe UI",Roboto,"Helvetica Neue",system-ui,sans-serif;direction:ltr;
+  text-shadow:0 0 1px rgba(255,255,255,.9),0 0 6px rgba(150,255,200,.55),0 1px 3px rgba(10,40,25,.55)}
+.hud svg{position:absolute;overflow:visible;filter:drop-shadow(0 0 3px rgba(150,255,200,.45)) drop-shadow(0 1px 1.5px rgba(10,40,25,.55))}
+.hud .t{position:absolute;font-weight:300;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hud .deg{top:2px;font-size:13px;letter-spacing:.5px}.hud .deg sup{font-size:8px;vertical-align:5px;margin-left:1px}
+.hud .wd{left:44px;top:64px;width:30px;text-align:center;font-size:12px;font-weight:600;letter-spacing:.5px}
+.hud .cr{left:146px;top:0;font-size:13px;font-weight:600;color:#86ff9f;display:flex;align-items:center;gap:3px}
+.hud .big{left:118px;top:13px;width:104px;text-align:center;font-size:40px;line-height:1;letter-spacing:1px}
+.hud .un{left:118px;top:55px;width:104px;text-align:center;font-size:10px;font-weight:600;opacity:.85;letter-spacing:.5px}
+.hud .lim{left:152px;top:69px;width:30px;height:30px;border-radius:50%;border:3.5px solid rgba(230,70,55,.88);background:rgba(240,250,246,.85);
+  color:#24343a;text-shadow:none;display:grid;place-items:center;font-size:12px;font-weight:600;box-shadow:0 0 6px rgba(150,255,200,.35)}
 .brand{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));
   text-align:center;line-height:1;opacity:.75;pointer-events:none;text-shadow:0 1px 5px rgba(60,35,10,.45)}
 .brand{width:58px;height:auto;opacity:.92;filter:drop-shadow(0 1px 4px rgba(40,22,6,.45))}
@@ -64,13 +69,13 @@ body.title .brand{width:84px}
 .btn.on{background:var(--glass-hi);border-color:var(--accent);color:var(--accent)}
 #gas{width:96px;height:96px;grid-column:2;grid-row:1;font-size:17px}
 #brake{width:66px;height:66px;grid-column:1;grid-row:1}
-#rot{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));top:calc(198px + env(safe-area-inset-top,0px));width:40px;height:40px;
+#rot{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));top:calc(232px + env(safe-area-inset-top,0px));width:40px;height:40px;
   display:grid;place-items:center;border-radius:12px;background:var(--glass-hi);border:1.5px solid var(--rim);color:#fff;pointer-events:none}
 #rot svg{animation:tilt 2.4s ease-in-out infinite;transform-origin:50% 50%}
 @keyframes tilt{0%,35%{transform:rotate(0)}55%,85%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
 @media (prefers-reduced-motion:reduce){#rot svg{animation:none}}
 @media (orientation:landscape){#rot{display:none}}
-#map{position:fixed;top:calc(78px + env(safe-area-inset-top,0px));left:calc(14px + env(safe-area-inset-left,0px));width:110px;height:110px;
+#map{position:fixed;top:calc(112px + env(safe-area-inset-top,0px));left:calc(14px + env(safe-area-inset-left,0px));width:110px;height:110px;
   border-radius:14px;border:1.5px solid var(--rim);background:rgba(42,33,24,.35);touch-action:none}
 #map.big{width:min(78vmin,420px);height:min(78vmin,420px);left:50%;top:50%;transform:translate(-50%,-50%);z-index:5}
 #wx{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);font-size:13px;
@@ -111,7 +116,23 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 
 <canvas id="c"></canvas>
 <div id="vig"></div>
-<div class="hud" aria-live="off"><div class="drift" id="drift"><svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 7.5l1-3.2h6l1 3.2M2.6 7.5h8.8v2.2H2.6zM4 9.7v1.2M10 9.7v1.2"/><path d="M1 3.2C2 1.6 4 .9 5.5 1.2M13 3.2c-1-1.6-3-2.3-4.5-2"/></svg><i id="driftN" style="font-style:normal">0°</i></div><b id="spd">0</b><span>كم/س</span></div>
+<div class="hud" aria-live="off">
+  <svg width="118" height="104" viewBox="0 0 118 104" fill="none" stroke="currentColor" stroke-linecap="round">
+    <path d="M25 42 A40 40 0 0 0 25 96" stroke-width="2"/><path d="M93 42 A40 40 0 0 1 93 96" stroke-width="2"/>
+    <path d="M18 54l5 1M16 69h5M18 84l5-1M100 54l-5 1M102 69h-5M100 84l-5-1" stroke-width="1.6"/>
+    <circle cx="40" cy="50" r="1.4" fill="currentColor" stroke="none"/><circle cx="78" cy="50" r="1.4" fill="currentColor" stroke="none"/>
+    <circle cx="40" cy="90" r="1.4" fill="currentColor" stroke="none"/><circle cx="78" cy="90" r="1.4" fill="currentColor" stroke="none"/>
+    <path d="M49 28v6M69 28v6" stroke-width="1.3"/>
+  </svg>
+  <span class="t deg" style="left:6px"><b id="hP" style="font-weight:300">00</b><sup>°</sup></span>
+  <span class="t deg" style="left:46px"><b id="hR" style="font-weight:300">00</b><sup>°</sup></span>
+  <span class="t deg" style="left:86px"><b id="hS" style="font-weight:300">00</b><sup>°</sup></span>
+  <span class="t wd" id="hWD">2WD</span>
+  <span class="t cr"><svg style="position:static;filter:none" width="16" height="15" viewBox="0 0 16 15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 8l1.2-3.6h4.6L11.5 8M4 8h8v2.6H4zM5.2 10.6v1.4M10.8 10.6v1.4"/><path d="M1.5 14L4 1.5M14.5 14L12 1.5"/></svg><b id="hC" style="font-weight:600">0</b></span>
+  <span class="t big" id="spd">0</span>
+  <span class="t un">km/h</span>
+  <span class="t lim" id="hL">120</span>
+</div>
 <img class="brand" src="brand/aboden_logo.png" alt="عبودين قيمز · ABODEN GAMES">
 <button id="reset" aria-label="إعادة السيارة">↺</button>
 <button id="radio" aria-label="الراديو">راديو</button>
@@ -1077,7 +1098,7 @@ function envTick(dt){
   clkEl.textContent=(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);wxnEl.textContent=WX_NAME[env.wx];
 }
 const clkEl=document.getElementById('clk'),wxnEl=document.getElementById('wxn'),toastEl=document.getElementById('toast');let toastT=0;
-const spdEl=document.getElementById('spd'),driftEl=document.getElementById('drift'),driftN=document.getElementById('driftN');
+const spdEl=document.getElementById('spd'),hud={P:document.getElementById('hP'),R:document.getElementById('hR'),S:document.getElementById('hS'),C:document.getElementById('hC'),WD:document.getElementById('hWD')};
 function showToast(t,sec){toastEl.textContent=t;toastEl.hidden=false;toastT=sec||3;}
 
 
@@ -1569,7 +1590,11 @@ function updateVisual(dt){
   camera.updateMatrixWorld();_p.set(S.x,S.y+1,S.z);const cz=_p.clone().applyMatrix4(camera.matrixWorldInverse).z;_p.project(camera);
   dustU.uCar.value.set(_p.x,_p.y,-cz);dustU.uAspect.value=camera.aspect;
   spdEl.textContent=Math.round(sp*3.6);
-  {const da=sp>3?Math.round(Math.abs(Math.atan2(S.vS||0,Math.abs(S.vF||0)))*57.3):0;driftEl.classList.toggle('on',da>8);driftN.textContent=da+'°';}  // drift angle, lit while sliding
+  // head-up gauges: pitch and roll read from the ground under the car, front-wheel angle, drive mode by road/sand; the speed sign is decorative
+  {const fx=Math.sin(S.h),fz=Math.cos(S.h),pd=v=>String(Math.min(99,Math.round(Math.abs(v)))).padStart(2,'0');
+   const pit=Math.atan2(H(S.x+fx*2,S.z+fz*2)-H(S.x-fx*2,S.z-fz*2),4)*57.3,rol=Math.atan2(H(S.x+fz*1,S.z-fx*1)-H(S.x-fz*1,S.z+fx*1),2)*57.3;
+   hud.P.textContent=pd(pit);hud.R.textContent=pd(rol);hud.S.textContent=pd(input.steer*34);hud.C.textContent=Math.round(sp*3.6);
+   if((hud.k=(hud.k||0)+1)%15===0)hud.WD.textContent=roadDist(S.x,S.z)<9?'2WD':'4WD';}
 }
 
 /* ---------------- resize + adaptive quality ---------------- */
