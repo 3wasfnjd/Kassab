@@ -64,6 +64,18 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sand);color:#fff
   background:var(--glass-hi);border:1.5px solid var(--accent);padding:6px 14px;border-radius:14px;font-size:15px;pointer-events:none}
 #build{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--glass-hi);
   padding:4px 12px;border-radius:12px;font-size:13px;pointer-events:none}
+#title{position:fixed;right:0;top:0;bottom:0;width:min(46vw,420px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));text-shadow:0 2px 14px rgba(40,22,6,.55)}
+body.title #title{display:flex}
+body.intro #title{display:none}
+@media (orientation:portrait){#title{left:0;width:auto;top:auto;bottom:calc(26px + env(safe-area-inset-bottom,0px))}}
+#title::before{content:"";position:absolute;inset:18% 4%;background:radial-gradient(closest-side,rgba(40,24,8,.32),rgba(40,24,8,0));z-index:-1}
+#title h1{margin:0;font-size:clamp(46px,11vmin,92px);font-weight:800;line-height:1.05;color:#fff7ea;letter-spacing:.01em}
+#title p{margin:0 0 12px;font-size:clamp(15px,3.6vmin,22px);font-weight:600;color:#ffe9c7}
+#start{font:800 22px var(--font);color:#2a2118;background:#f2c27a;border:0;border-radius:16px;padding:8px 46px 10px;box-shadow:0 4px 0 #a9773a,0 10px 30px rgba(40,22,6,.35);cursor:pointer}
+#start:active{transform:translateY(3px);box-shadow:0 1px 0 #a9773a}
+#start:focus-visible{outline:3px solid #fff;outline-offset:4px}
+body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build{display:none}
 #err{position:fixed;inset:auto 16px 50% 16px;text-align:center;color:var(--ink);font-size:15px}
 </style>
 </head>
@@ -89,6 +101,11 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sand);color:#fff
 <div id="rot" role="img" aria-label="دوّر الجوال بالعرض"><svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 <rect x="10" y="4" width="12" height="20" rx="2.5"/><path d="M14.5 20.5h3"/><path d="M26 15a10 10 0 0 1-6 11.5"/><path d="M17.5 24.5l2.6 2.1-.9 3.1"/></svg></div>
 <div id="err" hidden></div>
+<div id="title">
+  <h1>كسّاب</h1>
+  <p>هجولة في الطعوس</p>
+  <button id="start">ابدأ</button>
+</div>
 
 <script src="lib/three.min.js"></script>
 <script src="aa/core/math.js"></script>
@@ -134,6 +151,7 @@ function noise(x,z){const xi=Math.floor(x),zi=Math.floor(z),xf=x-xi,zf=z-zi,u=sm
 function fbm(x,z){return noise(x,z)*0.55+noise(x*2.03+7.1,z*2.03-3.3)*0.3+noise(x*4.1-2.7,z*4.1+9.2)*0.15;}
 function smoothstep(a,b,x){const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);}
 const CX=-4, CZ=-2; // compound centre (flat pad)
+const START=(()=>{const bx=300,bz=520,dx=-0.57,dz=-0.82;return{x:bx+dx*26,z:bz+dz*26,h:Math.atan2(dx,dz)};})(); // by the badia
 const WX=0.8, WZ=0.6; // wind direction (slip faces face downwind)
 function ridge(x,z){const n=noise(x,z);const r=1-Math.abs(2*n-1);return r*r;}
 function duneRaw(x,z){
@@ -223,7 +241,7 @@ scene.add(sun);scene.add(sun.target);
 /* ---------------- trail render target (tyre ruts) ---------------- */
 const RTO={minFilter:T.LinearFilter,magFilter:T.LinearFilter,depthBuffer:false,generateMipmaps:false};
 let trailRT=new T.WebGLRenderTarget(2048,2048,RTO),trailRT2=new T.WebGLRenderTarget(2048,2048,RTO);
-const trailU={map:{value:trailRT.texture},c:{value:new T.Vector2(CX,CZ)}};
+const trailU={map:{value:trailRT.texture},c:{value:new T.Vector2(START.x,START.z)}};
 const trailScene=new T.Scene();
 const trailCam=new T.Camera();
 const MAX_STAMPS=64;
@@ -373,7 +391,7 @@ function updateChunks(x,z,budget){
     if(d>3){dropChunk(k);for(let i=colliders.length-1;i>=0;i--)if(colliders[i].chunk===c)colliders.splice(i,1);}
     else{c.veg.forEach(v=>v.visible=d<=1);c.mesh.castShadow=d<=1;}}
 }
-updateChunks(CX,CZ,9);
+updateChunks(START.x,START.z,9);
 
 /* ---------------- geometry helpers ---------------- */
 function colored(geo,hex){geo=geo.index?geo.toNonIndexed():geo;const c=new T.Color(hex);const n=geo.attributes.position.count;
@@ -794,10 +812,11 @@ let stInit=false;
 function envTick(dt){
   env.day=(env.day+dt/DAY_LEN)%1;envU.time.value+=dt;
   // weather: drift between states every couple of minutes
-  env.next-=dt;if(env.next<=0){const opts=(env.wx==='cloudy'?['rain','rain','clear']:['clear','clear','haze','cloudy','storm','rain']).filter(k=>k!==env.wx);env.wx=opts[Math.floor(Math.random()*opts.length)];
-    env.next=env.wx==='storm'?55+Math.random()*35:env.wx==='rain'?110+Math.random()*60:80+Math.random()*80;showToast(env.wx==='storm'?'عاصفة رملية قادمة!':env.wx==='rain'?'بدأ المطر — راقب الوادي':WX_NAME[env.wx],2.5);}
+  env.next-=dt;if(env.next<=0&&env.wx==='storm'){env.wx='clear';env.next=80+Math.random()*80;}
+  else if(env.next<=0){const opts=(env.wx==='cloudy'?['rain','rain','clear']:['clear','clear','haze','cloudy','storm','rain']).filter(k=>k!==env.wx);env.wx=opts[Math.floor(Math.random()*opts.length)];
+    env.next=env.wx==='storm'?1.5:env.wx==='rain'?110+Math.random()*60:80+Math.random()*80;showToast(env.wx==='storm'?'هبّة رملية!':env.wx==='rain'?'بدأ المطر — راقب الوادي':WX_NAME[env.wx],2.5);}
   let near=0,far=0,sunK=0,wind=0,cloud=0,tint=[0,0,0];
-  for(const k in env.w){env.w[k]+=((k===env.wx?1:0)-env.w[k])*Math.min(1,dt*0.12);const w=env.w[k],c=WX_SET[k];
+  const wxRate=(env.wx==='storm'||env.w.storm>0.02)?2.4:0.12;for(const k in env.w){env.w[k]+=((k===env.wx?1:0)-env.w[k])*Math.min(1,dt*(k==='storm'?2.4:wxRate));const w=env.w[k],c=WX_SET[k];
     near+=c.near*w;far+=c.far*w;sunK+=c.sun*w;wind+=c.wind*w;cloud+=c.cloud*w;tint=[tint[0]+c.tint[0]*w,tint[1]+c.tint[1]*w,tint[2]+c.tint[2]*w];}
   const tot=Object.values(env.w).reduce((a,b)=>a+b,0);near/=tot;far/=tot;sunK/=tot;wind/=tot;cloud/=tot;tint=tint.map(v=>v/tot);
   // sun path
@@ -1129,6 +1148,7 @@ addEventListener('keydown',e=>{keys[e.code]=true;});addEventListener('keyup',e=>
 document.addEventListener('contextmenu',e=>e.preventDefault());
 window.__autopilot=null; // test hook: fn(t) -> {steer,gas,brake,hand}
 function readInput(t){
+  if(game.mode!=='play'&&!window.__autopilot){input.steer=0;input.gas=0;input.brake=0;input.hand=false;return;}
   if(window.__autopilot){Object.assign(input,window.__autopilot(t));return;}
   let s=touchSteer.val;if(keys.ArrowLeft||keys.KeyA)s=-1;if(keys.ArrowRight||keys.KeyD)s=1;
   input.steer+= (s-input.steer)*0.25;
@@ -1138,10 +1158,10 @@ function readInput(t){
 }
 
 /* ---------------- car physics (arcade drift on sand) ---------------- */
-const S={x:CX+6,z:CZ+2,y:0,vy:0,h:0.9,vx:0,vz:0,yaw:0,air:false,slip:0,spd:0,pitch:0,roll:0,airT:0};
+const S={x:START.x,z:START.z,y:0,vy:0,h:START.h,vx:0,vz:0,yaw:0,air:false,slip:0,spd:0,pitch:0,roll:0,airT:0};
 S.y=H(S.x,S.z);
 const _n=new T.Vector3(),_up=new T.Vector3(0,1,0);
-function resetCar(){S.x=CX+6;S.z=CZ+2;S.y=H(S.x,S.z);S.vx=S.vz=S.vy=0;S.yaw=0;S.h=0.9;S.air=false;}
+function resetCar(){S.x=START.x;S.z=START.z;S.y=H(S.x,S.z);S.vx=S.vz=S.vy=0;S.yaw=0;S.h=START.h;S.air=false;}
 document.getElementById('reset').addEventListener('click',resetCar);
 function collideCar(){
   const fx=Math.sin(S.h),fz=Math.cos(S.h);
@@ -1190,7 +1210,7 @@ function stepCar(dt){
     // gravity on slopes
     Hn(S.x,S.z,_n);S.vx+=_n.x*16*dt;S.vz+=_n.z*16*dt;
     const sp=Math.abs(vF);
-    let target=input.steer*Math.min(1,sp/5)*(2.1-Math.min(1.1,sp*0.03))*Math.sign(vF||1);
+    let target=-input.steer*Math.min(1,sp/5)*(2.1-Math.min(1.1,sp*0.03))*Math.sign(vF||1);
     if(input.hand)target*=1.55;
     S.yaw+=(target-S.yaw)*Math.min(1,7*dt);
   }else{S.yaw*=Math.exp(-0.6*dt);}
@@ -1199,10 +1219,10 @@ function stepCar(dt){
   collideCar();
   const gy=H(S.x,S.z);
   // heavy truck: strong gravity in the air, only real ramps launch it, and suspension soaks up most of the lift
-  if(S.air){S.vy-=32*dt;S.y+=S.vy*dt;S.airT+=dt;
+  if(S.air){S.vy-=27*dt;S.y+=S.vy*dt;S.airT+=dt;
     if(S.y<=gy){const hard=-S.vy;S.y=gy;S.air=false;S.vy=0;if(hard>4||S.airT>0.25){puff(S.x,S.z,Math.min(40,10+hard*3),2+hard*0.35);}}}
   else{const pred=S.y+S.vy*dt-16*dt*dt;
-    if(pred>gy+0.35&&S.vy>7){S.air=true;S.airT=0;S.vy*=0.6;S.y=S.y+S.vy*dt;}
+    if(pred>gy+0.22&&S.vy>5.2){S.air=true;S.airT=0;S.vy*=0.78;S.y=S.y+S.vy*dt;}
     else{const vy=(gy-S.y)/dt;S.vy+=(Math.max(-30,Math.min(30,vy))-S.vy)*0.5;S.y=gy;}}
   S.slip=Math.abs(vS)+(input.hand?Math.abs(vF)*0.35:0)+spin*6;
   S.spd=Math.hypot(S.vx,S.vz);
@@ -1277,7 +1297,9 @@ function stepParticles(dt){
 }
 
 /* ---------------- visuals: car pose + camera ---------------- */
-const camState={yaw:0.9,pos:new T.Vector3(),look:new T.Vector3(),init:false};
+const _tp=new T.Vector3(),_tl=new T.Vector3();
+const game={mode:'title',t:0,clock:0};
+const camState={yaw:START.h,pos:new T.Vector3(),look:new T.Vector3(),init:false};
 const _cn=new T.Vector3(),_tq=new T.Quaternion(),_fq=new T.Quaternion(),_m=new T.Matrix4(),_f=new T.Vector3(),_r=new T.Vector3();
 function updateVisual(dt){
   // terrain-aligned orientation from four wheel contact points
@@ -1293,7 +1315,7 @@ function updateVisual(dt){
   const lean=Math.max(-0.09,Math.min(0.09,-(S.vS||0)*0.012-S.yaw*(S.vF||0)*0.004));
   body.rotation.z+=(lean-body.rotation.z)*Math.min(1,8*dt);
   body.rotation.x+=((input.gas&&!S.air?-0.025:0)+(input.brake?0.035:0)-body.rotation.x)*Math.min(1,6*dt);
-  wheels.forEach(w=>{if(w.front)w.piv.rotation.y=input.steer*0.5;w.w.rotation.x+=(S.vF||0)*dt/0.47;});
+  wheels.forEach(w=>{if(w.front)w.piv.rotation.y=-input.steer*0.5;w.w.rotation.x+=(S.vF||0)*dt/0.47;});
   // camera: high, angled, lazily follows travel direction
   const sp=S.spd;
   if(sp>4){const vyaw=Math.atan2(S.vx,S.vz);let d=vyaw-camState.yaw;d=Math.atan2(Math.sin(d),Math.cos(d));camState.yaw+=d*Math.min(1,0.9*dt);}
@@ -1304,7 +1326,19 @@ function updateVisual(dt){
   const lx=S.x+Math.sin(camState.yaw)*4, lz=S.z+Math.cos(camState.yaw)*4;
   if(!camState.init){camState.pos.set(tx,ty,tz);camState.look.set(lx,S.y,lz);camState.init=true;}
   camState.pos.lerp(_p.set(tx,ty,tz),Math.min(1,2.4*dt));camState.look.lerp(_p.set(lx,S.y,lz),Math.min(1,5*dt));
-  camera.position.copy(camState.pos);camera.lookAt(camState.look);
+  if(game.mode==='play'){camera.position.copy(camState.pos);camera.lookAt(camState.look);}
+  else{
+    const sw=Math.sin(game.clock*0.22)*0.9;
+    const tp=_tp.set(S.x+fx*7.2+rx*(2.2+sw),S.y+1.35,S.z+fz*7.2+rz*(2.2+sw)),tl=_tl.set(S.x-fx*0.6,S.y+1.25,S.z-fz*0.6);
+    if(game.mode==='title'){camera.position.copy(tp);camera.lookAt(tl);camera.rotateY(innerHeight>innerWidth?0:-0.3);}
+    else{game.t+=dt;const k=Math.min(1,game.t/3.4),e=k*k*(3-2*k);
+      // rise and swing round from the bumper to the chase position
+      const a0=Math.atan2(tp.x-S.x,tp.z-S.z),a1=Math.atan2(camState.pos.x-S.x,camState.pos.z-S.z);let da=a1-a0;da=Math.atan2(Math.sin(da),Math.cos(da));
+      const r0=Math.hypot(tp.x-S.x,tp.z-S.z),r1=Math.hypot(camState.pos.x-S.x,camState.pos.z-S.z),a=a0+da*e,r=r0+(r1-r0)*e;
+      camera.position.set(S.x+Math.sin(a)*r,tp.y+(camState.pos.y-tp.y)*e+Math.sin(k*Math.PI)*6,S.z+Math.cos(a)*r);
+      camera.lookAt(_p.copy(tl).lerp(camState.look,e));
+      if(k>=1){game.mode='play';document.body.classList.remove('title','intro');}}
+  }
   // sun + shadow box follow car
   sun.position.set(S.x+SUN_DIR.x*120,S.y+SUN_DIR.y*120,S.z+SUN_DIR.z*120);sun.target.position.set(S.x,S.y,S.z);
   // dust light dir in view space
@@ -1443,12 +1477,16 @@ loadGLB('models/car.glb').catch(()=>loadCarJSON()).then(({g,tex})=>{
 /* ---------------- loop ---------------- */
 let mapT=0,wT=0;
 function worldTick(dt,now){
-  wT+=dt;
+  wT+=dt;game.clock+=dt;
   updateChunks(S.x,S.z,1);recenterTrail(S.x,S.z);
   soundTick(dt);envTick(dt);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}
   if(AAok){pumpQueue(queue.length>queueTotal*0.7?22:14);stepActors(dt);stepMovers(dt);stepTow(dt);AA.three.uniforms.uTime.value=wT;}
   mapT-=dt;if(mapT<=0){mapT=0.15;drawMap();}
 }
+/* title screen */
+document.body.classList.add('title');
+document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='title')return;game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();
+  if(snd.ctx&&snd.ctx.state==='suspended')snd.ctx.resume();});
 let last=performance.now(),acc=0,simT=0;
 window.__state=S;window.__dbg={sun,tMat,renderer,scene,dust,hemi,car,camera};
 function frame(now){
