@@ -752,6 +752,11 @@ if(AAok){
         if(i.walk&&e.id!=='cart')o.walk=i.walk;if(['lantern','carpet','sack','basket','coffee_set','fire_pit','mabkhara'].includes(e.id))o.nocol=true;
         if(e.id==='lantern')o.over=Object.assign({mount:'pole'},o.over||{});
         put(Q,e.id,i.x,i.z,o);}}}
+  // shoppers' cars parked nose-in along both outer walls of the souq
+  {const Q=site('souq');const CARS=[['pickup',{seed:501,color:'champagne'}],['jeep',{seed:502,color:'white',rack:true,rims:'steel'}],['pickup',{seed:503,color:'white',load:'crates'}],
+      ['pickup',{seed:504,color:'red'}],['jeep',{seed:505,color:'black',stripe:false,snorkel:false,bumper:'chrome'}],['pickup',{seed:506,color:'blue',load:'water'}]];
+    for(let i=0;i<8;i++){const x=-12.6+i*3.6;const a=CARS[i%6],b=CARS[(i+3)%6];
+      put(Q,a[0],x,-10.5,{over:a[1],rot:0.04*(i%3-1)});put(Q,b[0],x+0.4,10.5,{over:b[1],rot:Math.PI+0.04*(i%3-1)});}}
   // acacia and sidr along the wadi banks
   {const rw=AAr(321);for(let i=1;i<14;i++){const t=i/14,dS=t*WLEN,g=WSEG.find(q=>dS<=q.s+q.L);const u=(dS-g.s)/g.L,x=g.a[0]+(g.b[0]-g.a[0])*u,z=g.a[1]+(g.b[1]-g.a[1])*u;
     const nx=-(g.b[1]-g.a[1])/g.L,nz=(g.b[0]-g.a[0])/g.L,sd=(rw()<0.5?-1:1)*(13+rw()*8);put({x:0,z:0,group:scene},rw()<0.6?'talh':'sidr',x+nx*sd,z+nz*sd,{over:{seed:i%3?36:132},rot:rw()*6});}}
@@ -760,6 +765,35 @@ if(AAok){
   queueTotal=queue.length;
 }
 const buildEl=document.getElementById('build'),bpEl=document.getElementById('bp');
+// static batching: once a settlement is fully built, merge its non-animated meshes by material (far fewer draw calls)
+function batchGroup(grp){
+  grp.updateMatrixWorld(true);const inv=new T.Matrix4().copy(grp.matrixWorld).invert(),buckets=new Map(),drop=[];
+  grp.traverse(o=>{if(!o.isMesh||o.isSkinnedMesh||o.isInstancedMesh||!o.geometry.index)return;
+    let p=o.parent;while(p&&p!==grp){if(p.isBone||p.userData.anim)return;p=p.parent;}
+    const g=o.geometry,names=Object.keys(g.attributes).sort().join(','),key=o.material.uuid+'|'+names+'|'+o.castShadow;
+    let b=buckets.get(key);if(!b){b={mat:o.material,list:[],cast:o.castShadow,depth:o.customDepthMaterial};buckets.set(key,b);}
+    b.list.push({g,m:new T.Matrix4().multiplyMatrices(inv,o.matrixWorld)});drop.push(o);});
+  let made=0;
+  for(const b of buckets.values()){if(b.list.length<2)continue;
+    let nv=0,ni=0;b.list.forEach(e=>{nv+=e.g.attributes.position.count;ni+=e.g.index.count;});
+    const out=new T.BufferGeometry(),names=Object.keys(b.list[0].g.attributes);
+    names.forEach(n=>{const it=b.list[0].g.attributes[n].itemSize;out.setAttribute(n,new T.BufferAttribute(new Float32Array(nv*it),it));});
+    const idx=new Uint32Array(ni);let vo=0,io=0;const nm=new T.Matrix3(),v=new T.Vector3();
+    for(const e of b.list){const g=e.g,c=g.attributes.position.count;nm.getNormalMatrix(e.m);
+      names.forEach(n=>{const src=g.attributes[n],dst=out.attributes[n],it=src.itemSize;
+        for(let i=0;i<c;i++){if(n==='position'){v.fromBufferAttribute(src,i).applyMatrix4(e.m);dst.setXYZ(vo+i,v.x,v.y,v.z);}
+          else if(n==='normal'){v.fromBufferAttribute(src,i).applyMatrix3(nm).normalize();dst.setXYZ(vo+i,v.x,v.y,v.z);}
+          else for(let k=0;k<it;k++)dst.array[(vo+i)*it+k]=src.array[i*it+k];}});
+      const si=g.index.array;for(let i=0;i<si.length;i++)idx[io+i]=si[i]+vo;vo+=c;io+=si.length;}
+    out.setIndex(new T.BufferAttribute(idx,1));out.computeBoundingSphere();
+    const mesh=new T.Mesh(out,b.mat);mesh.castShadow=b.cast;mesh.receiveShadow=true;if(b.depth)mesh.customDepthMaterial=b.depth;grp.add(mesh);made++;
+    b.list.forEach(e=>{});}
+  // remove only meshes that went into a merged bucket
+  const merged=new Set();for(const b of buckets.values())if(b.list.length>=2)b.list.forEach(e=>merged.add(e.g));
+  drop.forEach(o=>{if(merged.has(o.geometry)&&o.parent)o.parent.remove(o);});
+  return made;
+}
+function batchReadySites(){for(const t of SITES){if(!t.group||t.batched)continue;if(queue.some(q=>q.st===t))continue;if(!t.group.children.length)continue;t.batched=true;batchGroup(t.group);}}
 function pumpQueue(ms){
   if(!queue.length)return;
   const t0=performance.now();
@@ -767,6 +801,7 @@ function pumpQueue(ms){
   if(queue.length>1){let bi=0,bd=1e18;for(let i=0;i<queue.length;i++){const q=queue[i],d=(q.st.x+q.lx-S.x)**2+(q.st.z+q.lz-S.z)**2;if(d<bd){bd=d;bi=i;}}
     if(bi){const t=queue[bi];queue[bi]=queue[0];queue[0]=t;}}
   while(queue.length&&performance.now()-t0<ms){try{runTask(queue.shift());}catch(e){console.warn('asset',e);}}
+  if(queueTotal&&!pumpQueue._b){pumpQueue._b=0;}batchReadySites();
   buildEl.hidden=!queue.length;bpEl.textContent=Math.round((1-queue.length/queueTotal)*100).toLocaleString('ar-SA');
 }
 // people walk their lanes, camels wander and graze, everyone gets out of the car's way;
