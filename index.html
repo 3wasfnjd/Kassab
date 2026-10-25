@@ -571,6 +571,7 @@ function getBuilt(id,over){const key=id+'|'+JSON.stringify(over||{});
   return builtCache[key];}
 function localAABB(b){if(b._box)return b._box;const bx=new T.Box3();b.parts.forEach(pt=>{pt.geo.computeBoundingBox();bx.union(pt.geo.boundingBox);});return(b._box=bx);}
 const VEH={jeep:1,pickup:1,lorry:1,wayt:1};const lightSrc=[];
+const HERDS=[];   // moving centres that flocks follow
 const actors=[];   // animated people/animals {g,site,x,z,rot,walk,wander,speed,col}
 const queue=[];    // build tasks, nearest site first
 let queueTotal=0;
@@ -584,9 +585,12 @@ function runTask(tk){
   if(o.keep&&!b.skeleton)o.keep(g,b);
   if(b.skeleton){
     const a={g,st,x,z,rot,y0:(o.y||0)-0.02,walk:o.walk?[st.x+o.walk[0],st.z+o.walk[1],st.x+o.walk[2],st.z+o.walk[3]]:null,wander:o.wander||0,cx:x,cz:z,
-      speed:(b.meta&&b.meta.walkSpeed)||0.9,dir:1,tx:x,tz:z,wait:Math.random()*4,col:{x,z,r:o.r||0.45},clip:o.clip,seated:(o.y||0)>0.04||/sit/.test(o.clip||''),big:tk.id==='camel'||tk.id==='donkey',flee:0};
+      speed:(b.meta&&b.meta.walkSpeed)||0.9,dir:1,tx:x,tz:z,wait:Math.random()*4,col:{x,z,r:o.r||0.45},clip:o.clip,seated:(o.y||0)>0.04||/sit/.test(o.clip||''),big:tk.id==='camel'||tk.id==='donkey'||tk.id==='horse',flee:0,herd:o.herd||null,roam:!!o.roam,pace:o.pace||1};
+    if(o.pace)a.speed*=o.pace;
+    if(o.rider){const rb=getBuilt('shaib',o.rider),rg=AA.three.instance(rb),seat=(b.meta&&b.meta.seat)||[0,1.62,-0.05];
+      rg.position.set(seat[0],seat[1]-0.5,seat[2]-0.08);g.add(rg);AA.three.play(rg,'sit',0);a.sub=rg;}
     a.col.a=a;actorC.push(a.col);actors.push(a);if(o.keep)o.keep(a);
-    if(a.walk||a.wander)AA.three.play(g,'walk',0);else if(o.clip)AA.three.play(g,o.clip,0);
+    if(a.walk||a.wander){AA.three.play(g,'walk',0);if(a.pace>1)setTimeScale(a,Math.min(1.8,a.pace*0.8));}else if(o.clip)AA.three.play(g,o.clip,0);
     return;
   }
   if(o.nocol)return;
@@ -614,6 +618,14 @@ if(AAok){
   [[150,250],[-260,-220],[640,110],[-120,560],[250,-120],[-380,-40]].forEach(([hx,hz],k)=>{const st={x:hx,z:hz,group:scene,id:'herd'};
     HERD.slice(0,6+(k%2)).forEach((ov,i)=>put(st,'camel',(i%3-1)*6+(k%2?2:0),Math.floor(i/3)*6-3,{over:ov,wander:42,rot:k+i,r:1.1}));
     put(st,'shaib',-4,-10,{over:k%2?SH1:SH2,wander:26,r:0.4});put(st,'boy',5,9,{over:BOY,wander:26,r:0.4});});
+  // -- flock: 30 sheep, a shepherd and a donkey, all following a slowly drifting centre
+  {const hx=225,hz=425,h={hx,hz,cx:hx,cz:hz,tx:hx,tz:hz,speed:0.45,range:90,pause:5};HERDS.push(h);const st={x:hx,z:hz,group:scene,id:'flock'};
+    const fl=AAr(77),looks=[SP1,SP2,{seed:201,breed:'naimi'},{seed:204,size:0.7}];
+    for(let i=0;i<30;i++){const a=fl()*6.283,r=2+fl()*9;put(st,'sheep',Math.cos(a)*r,Math.sin(a)*r,{over:looks[i%4],wander:9,herd:h,rot:fl()*6,r:0.35});}
+    put(st,'shaib',-11,3,{over:{seed:73,bisht:'brown',stoop:0.4},wander:14,herd:h,r:0.4});put(st,'donkey',-13,6,{over:{seed:206},wander:14,herd:h,r:0.7});}
+  // -- five horsemen roaming the open desert
+  [[0,300,'bay'],[-320,-300,'grey'],[520,40,'black'],[-480,520,'chestnut'],[220,-520,'bay']].forEach(([x,z,coat],i)=>
+    put({x,z,group:scene,id:'riders'},'horse',0,0,{over:{seed:400+i,coat},rider:i%2?SH1:{seed:410+i,bisht:i%3?'black':'cream'},wander:220,roam:true,pace:2.2,rot:i,r:0.9}));
   // -- Najdi village: walled quarter, mosque, well, palm orchard, coffee majlis
   const V=site('village');
   [[-21,H1],[-11.5,H2],[11.5,H3],[21,H2]].forEach(([x,ov])=>put(V,'najdi_house',x,-2.5-ov.depth/2,{over:ov}));
@@ -748,7 +760,14 @@ function knock(a){
   for(let i=0;i<5;i++)emitSpray(a.x,a.yy+0.5,a.z,a.vx*0.4+(Math.random()-0.5)*3,Math.random()*4,a.vz*0.4+(Math.random()-0.5)*3);
 }
 function setTimeScale(a,k){const st=a.g.userData.anim;if(st&&st.current)st.current.timeScale=k;}
+// open sand away from settlements, the wadi basin and the start camp
+function freeGround(x,z){if(Math.abs(x)>BOUND-30||Math.abs(z)>BOUND-30)return false;for(const t of SITES)if(Math.hypot(x-t.x,z-t.z)<t.r1+10)return false;
+  if(Math.hypot(x-LAKE.x,z-LAKE.z)<LAKE.r+20)return false;return true;}
+function stepHerds(dt){for(const h of HERDS){const dx=h.tx-h.cx,dz=h.tz-h.cz,d=Math.hypot(dx,dz);
+  if(d<2){h.pause-=dt;if(h.pause<=0){for(let i=0;i<8;i++){const an=Math.random()*6.283,r=30+Math.random()*h.range;const x=h.hx+Math.cos(an)*r,z=h.hz+Math.sin(an)*r;if(freeGround(x,z)){h.tx=x;h.tz=z;break;}}h.pause=20+Math.random()*25;}}
+  else{const st=Math.min(d,h.speed*dt);h.cx+=dx/d*st;h.cz+=dz/d*st;}}}
 function stepActors(dt){
+  stepHerds(dt);
   for(const a of actors){
     if(a.hidden){a.g.visible=false;continue;}
     const d2=(a.x-S.x)**2+(a.z-S.z)**2;a.g.visible=d2<260*260;if(!a.g.visible)continue;
@@ -774,13 +793,14 @@ function stepActors(dt){
     }else if(a.walk){const [x0,z0,x1,z1]=a.walk,tx=a.dir>0?x1:x0,tz=a.dir>0?z1:z0,dx=tx-a.x,dz=tz-a.z,d=Math.hypot(dx,dz);
       if(d<0.1)a.dir*=-1;else{const st=Math.min(d,a.speed*dt);a.x+=dx/d*st;a.z+=dz/d*st;a.rot=Math.atan2(dx,dz);}}
     else if(a.wander){
-      if(a.wait>0){a.wait-=dt;if(a.wait<=0){const an=Math.random()*6.283,r=Math.random()*a.wander;a.tx=a.cx+Math.cos(an)*r;a.tz=a.cz+Math.sin(an)*r;AA.three.play(a.g,'walk');}}
+      if(a.wait>0){a.wait-=dt;if(a.wait<=0){const c=a.herd||a;for(let tries=0;tries<6;tries++){const an=Math.random()*6.283,r=(a.roam?0.4+0.6*Math.random():Math.random())*a.wander;a.tx=c.cx+Math.cos(an)*r;a.tz=c.cz+Math.sin(an)*r;if(!a.roam||freeGround(a.tx,a.tz))break;}
+        AA.three.play(a.g,'walk');if(a.pace>1)setTimeScale(a,Math.min(1.8,a.pace*0.8));}}
       else{const dx=a.tx-a.x,dz=a.tz-a.z,d=Math.hypot(dx,dz);
-        if(d<0.3){a.wait=3+Math.random()*7;AA.three.play(a.g,Math.random()<0.6?'graze':'idle');}
+        if(d<0.3){a.wait=a.roam?1+Math.random()*3:a.herd?1+Math.random()*4:3+Math.random()*7;setTimeScale(a,1);AA.three.play(a.g,Math.random()<0.6?'graze':'idle');}
         else{const st=Math.min(d,a.speed*dt);a.x+=dx/d*st;a.z+=dz/d*st;const tr=Math.atan2(dx,dz);let dr=tr-a.rot;dr=Math.atan2(Math.sin(dr),Math.cos(dr));a.rot+=dr*Math.min(1,3*dt);}}}
     a.g.position.set(a.x,H(a.x,a.z)+yOff,a.z);a.g.rotation.set(a.tilt||0,a.rot,0,'YXZ');
     a.col.x=a.x;a.col.z=a.z;
-    if(d2<180*180&&a.g.userData.anim)a.g.userData.anim.mixer.update(dt);
+    if(d2<180*180&&a.g.userData.anim){a.g.userData.anim.mixer.update(dt);if(a.sub&&a.sub.userData.anim)a.sub.userData.anim.mixer.update(dt);}
   }
   for(const t of SITES)if(t.group)t.group.visible=Math.hypot(t.x-S.x,t.z-S.z)<560;
 }
@@ -894,7 +914,7 @@ let wadiWater,lakeWater;
   g.setIndex(idx);g.computeVertexNormals();for(let i=1;i<g.attributes.normal.array.length;i+=3){g.attributes.normal.array[i-1]=0;g.attributes.normal.array[i]=1;g.attributes.normal.array[i+1]=0;}
   wadiWater=new T.Mesh(g,waterMat);wadiWater.visible=false;wadiWater.renderOrder=2;scene.add(wadiWater);
   const lg=new T.CircleGeometry(LAKE.r+10,48);lg.rotateX(-PI/2);lg.setAttribute('aT',new T.Float32BufferAttribute(new Float32Array(lg.attributes.position.count),1));
-  lakeWater=new T.Mesh(lg,waterMat.clone());lakeWater.material.onBeforeCompile=waterMat.onBeforeCompile;lakeWater.material.color.set(0x5d7272);
+  lakeWater=new T.Mesh(lg,waterMat.clone());lakeWater.material.onBeforeCompile=waterMat.onBeforeCompile; // same muddy colour as the flood
   lakeWater.position.set(LAKE.x,LAKE_BED,LAKE.z);lakeWater.visible=false;lakeWater.renderOrder=2;scene.add(lakeWater);}
 // rain streaks around the car
 const RN_N=900,rnPos=new Float32Array(RN_N*6);
