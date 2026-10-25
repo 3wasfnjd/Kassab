@@ -1135,11 +1135,12 @@ function stepCar(dt){
   S.x+=S.vx*dt;S.z+=S.vz*dt;
   collideCar();
   const gy=H(S.x,S.z);
-  if(S.air){S.vy-=22*dt;S.y+=S.vy*dt;S.airT+=dt;
+  // heavy truck: strong gravity in the air, only real ramps launch it, and suspension soaks up most of the lift
+  if(S.air){S.vy-=32*dt;S.y+=S.vy*dt;S.airT+=dt;
     if(S.y<=gy){const hard=-S.vy;S.y=gy;S.air=false;S.vy=0;if(hard>4||S.airT>0.25){puff(S.x,S.z,Math.min(40,10+hard*3),2+hard*0.35);}}}
-  else{const pred=S.y+S.vy*dt-11*dt*dt;
-    if(pred>gy+0.06&&S.vy>3){S.air=true;S.airT=0;S.y=pred;S.vy-=22*dt;}
-    else{const vy=(gy-S.y)/dt;S.vy=Math.max(-30,Math.min(30,vy));S.y=gy;}}
+  else{const pred=S.y+S.vy*dt-16*dt*dt;
+    if(pred>gy+0.35&&S.vy>7){S.air=true;S.airT=0;S.vy*=0.6;S.y=S.y+S.vy*dt;}
+    else{const vy=(gy-S.y)/dt;S.vy+=(Math.max(-30,Math.min(30,vy))-S.vy)*0.5;S.y=gy;}}
   S.slip=Math.abs(vS)+(input.hand?Math.abs(vF)*0.35:0)+spin*6;
   S.spd=Math.hypot(S.vx,S.vz);
   S.vF=vF;S.vS=vS;
@@ -1276,21 +1277,33 @@ const snd={ctx:null};window.__snd=snd;
 function initSound(){
   if(snd.ctx)return;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
   const c=new AC(),out=c.createGain();out.gain.value=0.9;out.connect(c.destination);snd.ctx=c;snd.out=out;
-  // engine: two detuned saws + a sub square, soft-clipped, through a throttle-dependent low-pass
-  const eng=c.createGain();eng.gain.value=0;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=500;lp.Q.value=2.5;
-  const shp=c.createWaveShaper();const cv=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;cv[i]=Math.tanh(x*2.6);}shp.curve=cv;
-  const o1=c.createOscillator(),o2=c.createOscillator(),o3=c.createOscillator();o1.type='sawtooth';o2.type='sawtooth';o3.type='square';o2.detune.value=14;
-  const g1=c.createGain(),g2=c.createGain(),g3=c.createGain();g1.gain.value=0.45;g2.gain.value=0.3;g3.gain.value=0.35;
-  [[o1,g1],[o2,g2],[o3,g3]].forEach(([o,g])=>{o.connect(g);g.connect(shp);o.start();});
-  shp.connect(lp);lp.connect(eng);eng.connect(out);
+  // engine: a looped buffer of real-ish V8 firing pulses (uneven cross-plane rhythm, each pulse a decaying
+  // thump + a little combustion noise). Pitch follows RPM through playbackRate, a low-pass opens with throttle.
+  const SR=c.sampleRate,CYC=0.12,NC=10,eb=c.createBuffer(1,Math.round(SR*CYC*NC),SR),ed=eb.getChannelData(0);
+  const fire=[0,0.115,0.25,0.365,0.5,0.625,0.75,0.87];                       // cross-plane: slightly uneven gaps
+  for(let k=0;k<NC;k++)fire.forEach((ph,j)=>{
+    const t0=Math.round(SR*CYC*(k+ph+(Math.random()-0.5)*0.012)),amp=0.75+Math.random()*0.35+(j%2?0:0.12),f=58+Math.random()*10;
+    let nlp=0;
+    for(let i=0;i<SR*0.05;i++){const t=i/SR,idx=t0+i;if(idx>=ed.length)break;
+      const env=Math.exp(-t*55)*(1-Math.exp(-t*900));nlp=nlp*0.82+(Math.random()*2-1)*0.18;
+      ed[idx]+=amp*env*(Math.sin(2*Math.PI*f*t)*0.85+Math.sin(2*Math.PI*f*2.02*t)*0.25+nlp*0.9);}
+  });
+  let pk=0;for(let i=0;i<ed.length;i++)pk=Math.max(pk,Math.abs(ed[i]));for(let i=0;i<ed.length;i++)ed[i]/=pk;
+  const es=c.createBufferSource();es.buffer=eb;es.loop=true;es.start();
+  const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=420;lp.Q.value=0.7;
+  const lp2=c.createBiquadFilter();lp2.type='lowpass';lp2.frequency.value=1800;lp2.Q.value=0.5;
+  const shp=c.createWaveShaper();const cv=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;cv[i]=Math.tanh(x*1.4)/Math.tanh(1.4);}shp.curve=cv;
+  const body=c.createBiquadFilter();body.type='peaking';body.frequency.value=110;body.gain.value=5;body.Q.value=0.9; // chassis resonance
+  const eng=c.createGain();eng.gain.value=0;
+  es.connect(lp);lp.connect(shp);shp.connect(body);body.connect(lp2);lp2.connect(eng);eng.connect(out);
   // sand: looped noise, band-passed for the gritty spray of tyres digging in ("tat'ees"), plus a high hiss
   const nb=c.createBuffer(1,c.sampleRate*2,c.sampleRate),nd=nb.getChannelData(0);let last=0;
-  for(let i=0;i<nd.length;i++){const w=Math.random()*2-1;last=last*0.6+w*0.4;nd[i]=(Math.random()<0.004?w*2.5:last);}
+  for(let i=0;i<nd.length;i++){const w=Math.random()*2-1;last=last*0.6+w*0.4;nd[i]=last;}
   const ns=c.createBufferSource();ns.buffer=nb;ns.loop=true;ns.start();
   const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=700;bp.Q.value=0.8;const sand=c.createGain();sand.gain.value=0;
-  const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=2500;const hiss=c.createGain();hiss.gain.value=0;
+  const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=1800;const hiss=c.createGain();hiss.gain.value=0;
   ns.connect(bp);bp.connect(sand);sand.connect(out);ns.connect(hp);hp.connect(hiss);hiss.connect(out);
-  Object.assign(snd,{eng,lp,o1,o2,o3,sand,bp,hiss,rpm:900,gear:1,wasAir:false});
+  Object.assign(snd,{eng,lp,es,sand,bp,hiss,rpm:900,gear:1,wasAir:false});
 }
 ['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,()=>{initSound();if(snd.ctx&&snd.ctx.state==='suspended')snd.ctx.resume();},{capture:true,passive:true}));
 document.addEventListener('visibilitychange',()=>{if(!snd.ctx)return;document.hidden?snd.ctx.suspend():snd.ctx.resume();});
@@ -1309,16 +1322,53 @@ function soundTick(dt){
   target+=spin*1800*thr;if(!thr)target=Math.max(900,target*0.75);
   if(snd.shift>0){snd.shift-=dt;target*=0.8;}
   snd.rpm+=(target-snd.rpm)*Math.min(1,dt*(thr?6:3));
-  const f=snd.rpm/30;snd.o1.frequency.setTargetAtTime(f,t,0.03);snd.o2.frequency.setTargetAtTime(f*1.003,t,0.03);snd.o3.frequency.setTargetAtTime(f*0.5,t,0.03);
-  snd.lp.frequency.setTargetAtTime(380+thr*1500+snd.rpm*0.18,t,0.05);
-  snd.eng.gain.setTargetAtTime(0.06+thr*0.07+Math.min(0.04,sp*0.001),t,0.06);
+  // buffer recorded at 1000 rpm (one 4-stroke cycle = 0.12 s)
+  snd.es.playbackRate.setTargetAtTime(snd.rpm/1000,t,0.04);
+  snd.lp.frequency.setTargetAtTime(300+thr*700+snd.rpm*0.09,t,0.06);
+  snd.eng.gain.setTargetAtTime(0.2+thr*0.16+Math.min(0.06,sp*0.002),t,0.08);
   // sand spray: grows with slip (drifting, wheelspin) and a little with speed; silent in the air or in water
   const onSand=!S.air&&!S.wet;const slipK=Math.min(1,(S.slip||0)*0.07);
-  const grit=onSand?Math.min(0.55,slipK*0.5+sp*0.004)*(0.75+0.5*Math.random()):0;
-  snd.sand.gain.setTargetAtTime(grit,t,0.04);snd.bp.frequency.setTargetAtTime(500+slipK*900+Math.random()*200,t,0.05);
-  snd.hiss.gain.setTargetAtTime(onSand?slipK*0.12:(S.wet&&sp>2?Math.min(0.25,sp*0.015):0),t,0.05);
+  const grit=onSand?Math.min(0.32,slipK*0.3+sp*0.0025)*(0.85+0.3*Math.random()):0;
+  snd.sand.gain.setTargetAtTime(grit,t,0.04);snd.bp.frequency.setTargetAtTime(380+slipK*500,t,0.08);
+  snd.hiss.gain.setTargetAtTime(onSand?slipK*0.05:(S.wet&&sp>2?Math.min(0.25,sp*0.015):0),t,0.05);
   if(snd.wasAir&&!S.air)thump(Math.min(1,0.3+Math.abs(S.vy||0)*0.05+0.4));snd.wasAir=S.air;
 }
+
+/* ---------------- player pickup model (models/car.glb, single textured mesh) ---------------- */
+async function loadGLB(url){
+  const ab=await (await fetch(url)).arrayBuffer(),dv=new DataView(ab);
+  if(dv.getUint32(0,true)!==0x46546C67)throw new Error('not a GLB');
+  const jl=dv.getUint32(12,true),j=JSON.parse(new TextDecoder().decode(new Uint8Array(ab,20,jl))),bo=20+jl+8;
+  const view=i=>{const v=j.bufferViews[i];return{off:bo+(v.byteOffset||0),len:v.byteLength};};
+  const acc=i=>{const a=j.accessors[i],v=view(a.bufferView),n={SCALAR:1,VEC2:2,VEC3:3,VEC4:4}[a.type]*a.count,
+    C={5126:Float32Array,5125:Uint32Array,5123:Uint16Array,5121:Uint8Array}[a.componentType],o=v.off+(a.byteOffset||0);
+    return new C(ab.slice(o,o+n*C.BYTES_PER_ELEMENT));};
+  const pr=j.meshes[0].primitives[0],g=new T.BufferGeometry();
+  g.setAttribute('position',new T.BufferAttribute(acc(pr.attributes.POSITION),3));g.setAttribute('normal',new T.BufferAttribute(acc(pr.attributes.NORMAL),3));
+  g.setAttribute('uv',new T.BufferAttribute(acc(pr.attributes.TEXCOORD_0),2));g.setIndex(new T.BufferAttribute(acc(pr.indices),1));
+  let tex=null;if(j.images&&j.images.length){const im=j.images[0],iv=view(im.bufferView);
+    const img=await createImageBitmap(new Blob([new Uint8Array(ab,iv.off,iv.len)],{type:im.mimeType}));
+    tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.anisotropy=4;tex.needsUpdate=true;}
+  return{g,tex};
+}
+const CAR_LEN=5.5;
+loadGLB('models/car.glb').then(({g,tex})=>{
+  g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
+  const m=new T.Mesh(g,new T.MeshStandardMaterial({map:tex,roughness:0.55,metalness:0.15}));
+  m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.castShadow=true;m.receiveShadow=true;
+  body.children.forEach(o=>{if(o.isMesh&&o!==carLamps.tailPool&&o!==carLamps.headPool&&o.material!==lampMat&&o.material!==tailMat)o.visible=false;});
+  body.children.forEach(o=>{if(o.material===lampMat||o.material===tailMat)o.visible=false;});
+  wheels.forEach(w=>w.w.visible=false);           // the model carries its own wheels
+  body.add(m);
+  // move the glow sprites onto the model's lamps
+  const H2=(bb.max.y-bb.min.y)*k,W2=(bb.max.x-bb.min.x)*k;
+  carLamps.tails.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.4,H2*0.58,-CAR_LEN/2-0.04));
+  carLamps.rev.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.3,H2*0.58,-CAR_LEN/2-0.04));
+  carLamps.heads.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.36,H2*0.53,CAR_LEN/2+0.05));
+  carLamps.tailPool.position.z=-CAR_LEN/2-1.6;
+  heads.forEach((l,i)=>l.position.set((i?1:-1)*W2*0.32,H2*0.52,CAR_LEN/2-0.1));
+  window.__carModel=m;
+}).catch(e=>console.warn('car model',e));
 
 /* ---------------- loop ---------------- */
 let mapT=0,wT=0;

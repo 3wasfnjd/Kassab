@@ -29,6 +29,7 @@
 | `lib/three.min.js` | محرك Three.js r149 (رخصة MIT في `lib/three-LICENSE.txt`) |
 | `aa/` | مولّدات الأصول من مستودع Aboden-Assets (نخيل، عمارة نجدية، بيت شعر، إبل، ناس، مركبات) |
 | `fonts/` | خط Baloo Bhaijaan 2 (رخصة OFL في `fonts/OFL.txt`) |
+| `models/car.glb` | موديل الوانيت (مخفّف: ٢٥ ألف مثلث، خامة ١٠٢٤، أقل من ١ ميقا) |
 | `radio/` | أغاني الراديو: أربع مقاطع ٣٠ ثانية (`1.mp3` … `4.mp3`) |
 
 ملاحظة: `aa/core/viewer-three.js` معدّل قليلاً عن الأصل ليتوافق مع Three.js r149.
