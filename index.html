@@ -35,6 +35,18 @@ body.title .brand{width:84px}
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;font:700 13px var(--font)}
 #radio.on{border-color:var(--accent);color:var(--accent);background:var(--glass-hi)}
 #steer{position:fixed;left:0;bottom:0;width:48%;height:58%;}
+#wxBtn{position:fixed;top:calc(168px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
+  border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
+#wxBtn.on{border-color:var(--accent);color:var(--accent);background:var(--glass-hi)}
+#wxPanel{position:fixed;top:calc(168px + env(safe-area-inset-top,0px));right:calc(62px + env(safe-area-inset-right,0px));width:min(250px,60vw);padding:10px 10px 8px;
+  border-radius:16px;border:1.5px solid var(--rim);background:rgba(58,40,22,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff;direction:rtl;font:700 12px var(--font)}
+#wxPanel[hidden]{display:none}
+#wxPanel h6{margin:2px 4px 6px;font:800 12px var(--font);opacity:.75}
+#wxPanel .row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+#wxPanel button{height:44px;border-radius:11px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:700 12px var(--font);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
+#wxPanel button i{font-style:normal;font-size:16px;line-height:1}
+#wxPanel button.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
 #knobBase{position:absolute;left:calc(26px + env(safe-area-inset-left,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));
   width:150px;height:64px;border-radius:32px;background:var(--glass);border:1.5px solid var(--rim)}
 #knob{position:absolute;top:50%;left:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
@@ -86,7 +98,7 @@ body.title:not(.intro) #load{display:flex}
 @media (prefers-reduced-motion:reduce){#start.show{animation:none}}
 #start:active{transform:translateY(3px);box-shadow:0 1px 0 #a9773a}
 #start:focus-visible{outline:3px solid #fff;outline-offset:4px}
-body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build{display:none}
+body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build,body.title #wxBtn,body.title #wxPanel{display:none!important}
 #err{position:fixed;inset:auto 16px 50% 16px;text-align:center;color:var(--ink);font-size:15px}
 </style>
 </head>
@@ -99,6 +111,19 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <img class="brand" src="brand/aboden_logo.png" alt="عبودين قيمز · ABODEN GAMES">
 <button id="reset" aria-label="إعادة السيارة">↺</button>
 <button id="radio" aria-label="الراديو">راديو</button>
+<button id="wxBtn" aria-label="التحكم بالطقس"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="3.4"/><path d="M9 2.2v1.6M2.2 9h1.6M4.2 4.2l1.1 1.1M13.8 4.2l-1.1 1.1"/><path d="M8.5 19.5h9a3.3 3.3 0 0 0 .2-6.6 4.6 4.6 0 0 0-8.7 1.1 2.8 2.8 0 0 0-.5 5.5z" fill="rgba(0,0,0,.25)"/></svg></button>
+<div id="wxPanel" hidden>
+  <h6>الطقس</h6>
+  <div class="row" id="wxRow">
+    <button data-wx="auto" class="on"><i>⟳</i>تلقائي</button><button data-wx="clear"><i>☀</i>صحو</button><button data-wx="cloudy"><i>☁</i>غائم</button>
+    <button data-wx="rain"><i>☂</i>مطر</button><button data-wx="haze"><i>≋</i>غبار</button><button data-wx="storm"><i>🌪</i>هبّة</button>
+  </div>
+  <h6>الوقت</h6>
+  <div class="row" id="dayRow">
+    <button data-day="auto" class="on"><i>⟳</i>يمشي</button><button data-day="0.27"><i>🌅</i>شروق</button><button data-day="0.5"><i>☀</i>ظهر</button>
+    <button data-day="0.72"><i>🌇</i>غروب</button><button data-day="0.96"><i>☾</i>ليل</button><button data-day="0.12"><i>✦</i>فجر</button>
+  </div>
+</div>
 <div id="steer"><div id="knobBase"><div id="knob"></div></div></div>
 <div class="pads">
   <button class="btn" id="gas">بنزين</button>
@@ -959,7 +984,7 @@ function stepActors(dt){
 
 /* ---------------- day/night, weather, lights ---------------- */
 const DAY_LEN=600;                     // a full day in seconds
-const env={day:0.36,wx:'clear',w:{clear:1,haze:0,storm:0,cloudy:0,rain:0},next:70,n:0,light:1,wadi:0,front:0,lake:0,wet:0,told:false};
+const env={lock:null,dayLock:null,gust:0,day:0.36,wx:'clear',w:{clear:1,haze:0,storm:0,cloudy:0,rain:0},next:70,n:0,light:1,wadi:0,front:0,lake:0,wet:0,told:false};
 const WX_NAME={clear:'صحو',haze:'غبار',storm:'عاصفة رملية',cloudy:'غائم',rain:'مطر'};
 const WX_SET={clear:{near:70,far:260,sun:1,wind:0.55,cloud:0,tint:[0,0,0]},haze:{near:35,far:170,sun:0.75,wind:0.9,cloud:0,tint:[0.02,-0.01,-0.05]},
   storm:{near:6,far:62,sun:0.32,wind:1.9,cloud:0.3,tint:[-0.06,-0.12,-0.2]},cloudy:{near:60,far:240,sun:0.55,wind:0.7,cloud:1,tint:[-0.05,-0.04,-0.02]},
@@ -981,9 +1006,13 @@ stGeo.setAttribute('aSize',new T.BufferAttribute(stSize,1));stGeo.setAttribute('
 let stormPts=null; // created after the dust material exists
 let stInit=false;
 function envTick(dt){
-  env.day=(env.day+dt/DAY_LEN)%1;envU.time.value+=dt;
-  // weather: drift between states every couple of minutes
-  env.next-=dt;if(env.next<=0&&env.wx==='storm'){env.wx='clear';env.next=80+Math.random()*80;}
+  if(env.dayLock==null)env.day=(env.day+dt/DAY_LEN)%1;
+  else{let d=env.dayLock-env.day;d-=Math.round(d);env.day=((env.day+d*Math.min(1,dt*1.8))%1+1)%1;}   // ease to the chosen hour the short way round
+  envU.time.value+=dt;
+  // weather: player-picked state from the weather panel, a one-off gust, or drift between states every couple of minutes
+  if(env.gust>0){env.gust-=dt;env.wx='storm';if(env.gust<=0){env.wx=env.lock||'clear';env.next=80+Math.random()*80;}}
+  else if(env.lock){env.wx=env.lock;env.next=60;}
+  else if((env.next-=dt)<=0&&env.wx==='storm'){env.wx='clear';env.next=80+Math.random()*80;}
   else if(env.next<=0){const opts=(env.wx==='cloudy'?['rain','rain','clear']:['clear','clear','haze','cloudy','storm','rain']).filter(k=>k!==env.wx);env.wx=opts[Math.floor(Math.random()*opts.length)];
     env.next=env.wx==='storm'?1.5:env.wx==='rain'?110+Math.random()*60:80+Math.random()*80;showToast(env.wx==='storm'?'هبّة رملية!':env.wx==='rain'?'بدأ المطر — راقب الوادي':WX_NAME[env.wx],2.5);}
   let near=0,far=0,sunK=0,wind=0,cloud=0,tint=[0,0,0];
@@ -1555,6 +1584,19 @@ function tune(k){station=k;radioEl.classList.toggle('on',k>0);radioEl.textConten
   if(pr&&pr.catch)pr.catch(()=>{});}
 radioEl.addEventListener('click',()=>tune((station+1)%(RADIO.length+1)));
 audio.addEventListener('ended',()=>tune(station%RADIO.length+1));
+// weather panel: a small icon opens it; weather and time of day can be pinned or left automatic
+{const btn=document.getElementById('wxBtn'),pan=document.getElementById('wxPanel'),wxRow=document.getElementById('wxRow'),dayRow=document.getElementById('dayRow');
+  const open=v=>{pan.hidden=!v;btn.classList.toggle('on',v);};
+  btn.addEventListener('click',e=>{e.stopPropagation();open(pan.hidden);});
+  pan.addEventListener('pointerdown',e=>e.stopPropagation());
+  document.addEventListener('pointerdown',e=>{if(!pan.hidden&&e.target!==btn&&!btn.contains(e.target))open(false);});
+  const mark=(row,b)=>row.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  wxRow.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.wx;
+    if(k==='storm'){env.gust=1.5;showToast('هبّة رملية!',1.5);return;}
+    mark(wxRow,b);if(k==='auto'){env.lock=null;env.next=60+Math.random()*60;showToast('الطقس تلقائي',1.5);}
+    else{env.lock=k;env.wx=k;showToast(k==='rain'?'مطر — راقب الوادي':WX_NAME[k],1.5);}});
+  dayRow.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.day;mark(dayRow,b);
+    env.dayLock=k==='auto'?null:+k;showToast(k==='auto'?'الوقت يمشي':b.lastChild.textContent.trim(),1.5);});}
 audio.addEventListener('error',()=>{if(station)showToast('الأغنية '+AR(station)+' ما انضافت بعد',2.5);});
 
 /* ---------------- engine + sand sounds (synthesised with Web Audio, no files) ---------------- */
