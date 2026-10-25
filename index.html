@@ -1541,12 +1541,21 @@ async function loadCarJSON(name){
   const img=await createImageBitmap(await (await fetch('models/'+name+'.jpg')).blob());const tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.anisotropy=4;tex.needsUpdate=true;
   return{g,tex};}
 const loadCar=name=>loadGLB('models/'+name+'.glb').catch(()=>loadCarJSON(name));
+// the original model (511k triangles) is too big for one published file, so it comes as four parts + the texture
+async function loadCarSplit(name){
+  const C={5126:Float32Array,5125:Uint32Array,5123:Uint16Array};
+  const part=async k=>{const j=await (await fetch('models/'+name+'_'+k+'.json')).json(),bin=atob(j.d),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new C[j.t](u.buffer);};
+  const [pos,nor,uv,idx]=await Promise.all(['pos','nor','uv','idx'].map(part));
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(pos,3));g.setAttribute('normal',new T.BufferAttribute(nor,3));
+  g.setAttribute('uv',new T.BufferAttribute(uv,2));g.setIndex(new T.BufferAttribute(idx,1));
+  const img=await createImageBitmap(await (await fetch('models/'+name+'.jpg')).blob());const tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.needsUpdate=true;
+  return{g,tex};}
 function showProcCar(v){body.children.forEach(o=>{if(o.isMesh&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=v;});wheels.forEach(w=>w.w.visible=v);}
 showProcCar(false);
 function carMesh({g,tex}){g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
   const m=new T.Mesh(g,new T.MeshStandardMaterial({map:tex,roughness:0.55,metalness:0.15}));
   m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;return m;}
-// two versions: the detailed one (128k triangles, 2048 texture) for the title close-up, the light one (25k) for driving
+// two versions: the original model as sent (511k triangles, 2048 texture) for the title page only, the light one (25k) for driving
 const carModels={light:null,hq:null};
 function useCar(m){
   if(!m)return;[carModels.light,carModels.hq].forEach(o=>{if(o&&o!==m)o.visible=false;});m.visible=true;if(!m.parent)body.add(m);
@@ -1564,8 +1573,8 @@ function dropHQ(){const m=carModels.hq;if(!m)return;carModels.hq=null;if(carMode
   body.remove(m);m.geometry.dispose();if(m.material.map)m.material.map.dispose();m.material.dispose();}
 loadCar('car').then(d=>{carModels.light=carMesh(d);if(!carModels.hq||game.mode==='play')useCar(carModels.light);else{carModels.light.visible=false;body.add(carModels.light);}})
   .catch(e=>{console.warn('car model',e);if(!carModels.hq)showProcCar(true);});
-loadCar('car_hq').then(d=>{if(game.mode==='play'){d.g.dispose();return;}carModels.hq=carMesh(d);carModels.hq.material.map.anisotropy=8;useCar(carModels.hq);})
-  .catch(e=>console.warn('hq car',e));
+loadGLB('models/car_orig.glb').catch(()=>loadCarSplit('car_orig')).then(d=>{if(game.mode==='play'){d.g.dispose();return;}carModels.hq=carMesh(d);carModels.hq.material.map.anisotropy=8;useCar(carModels.hq);})
+  .catch(e=>console.warn('original car',e));
 
 /* ---------------- loop ---------------- */
 let mapT=0,wT=0;
