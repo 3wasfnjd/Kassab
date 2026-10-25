@@ -1587,7 +1587,8 @@ function worldTick(dt,now){
 }
 /* title screen */
 document.body.classList.add('title');
-document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='title')return;game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();
+document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='title')return;game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();if(!station)tune(1); // radio starts with the same tap as the engine
+  
   if(snd.ctx&&snd.ctx.state==='suspended')snd.ctx.resume();});
 let last=performance.now(),acc=0,simT=0;
 window.__state=S;window.__dbg={sun,tMat,renderer,scene,dust,hemi,car,camera};
