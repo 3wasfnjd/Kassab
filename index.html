@@ -715,11 +715,11 @@ if(AAok){
     put(st,'shaib',-11,3,{over:{seed:73,bisht:'brown',stoop:0.4},wander:14,herd:h,r:0.4});put(st,'donkey',-13,6,{over:{seed:206},wander:14,herd:h,r:0.7});}
   // -- caravan camp: Saudi desert caravan, water tanker, a herd of 50 white camels (wadh / maghateer) with two herders,
   //    a big SUV and a work pickup with a cage (generic library vehicles, no brands)
-  {const K=site('caravan');K.group.add(makeCaravan(K.x,K.z,0.35));
-    put(K,'wayt',-9,6,{rot:2.0,over:{seed:29,tank:'white'}});
+  {const K=site('caravan'),WS=1.4,WD=-4.3*(WS-1);   // the camp's tanker is scaled up; WD shifts the hose/trough back to its new tailK.group.add(makeCaravan(K.x,K.z,0.35));
+    put(K,'wayt',-9,6,{rot:2.0,scale:WS,over:{seed:29,tank:'white'}});
     {const r=2.0,c=Math.cos(r),s=Math.sin(r),lp=(x,z)=>[K.x-9+x*c+z*s,K.z+6-x*s+z*c];   // tanker-local -> world (the tanker's rear valve sits at local (0.5,0.6,-4.15))
-     const [tx,tz]=lp(0.2,-8.0);K.group.add(makeTrough(tx,tz,r));   // trough lies across the tanker's tail
-     const g0=H(tx,tz);K.group.add(makeHose([[0.5,-4.3,0.6],[0.45,-5.4,0.07],[0.35,-6.6,0.07],[0.3,-7.25,0.5],[0.3,-7.5,0.78],[0.3,-7.75,0.5]].map(([x,z,y])=>{const [wx,wz]=lp(x,z);return [wx,g0+y,wz];})));}
+     const [tx,tz]=lp(0.2,-8.0+WD);K.group.add(makeTrough(tx,tz,r));   // trough lies across the tanker's tail
+     const g0=H(tx,tz);K.group.add(makeHose([[0.5*WS,-4.3*WS,0.6*WS],[0.45,-5.4+WD,0.07],[0.35,-6.6+WD,0.07],[0.3,-7.25+WD,0.5],[0.3,-7.5+WD,0.78],[0.3,-7.75+WD,0.5]].map(([x,z,y])=>{const [wx,wz]=lp(x,z);return [wx,g0+y,wz];})));}
     put(K,'jeep',9,9,{rot:-2.6,over:{seed:610,color:'white',rack:false,tire:1.12,rims:'silver',dirt:0.15,snorkel:false,stripe:false,bumper:'chrome'}});
     put(K,'pickup',13,1,{rot:-1.9,over:{seed:611,color:'white',cage:true,load:'none',rims:'steel',dirt:0.4}});
     put(K,'carpet',-3,-7,{rot:0.4,over:{seed:612,length:3,width:2},nocol:true});put(K,'fire_pit',-3,-7,{over:{seed:613},nocol:true});
@@ -729,7 +729,7 @@ if(AAok){
     const wr=AAr(55),W1={seed:620,coat:'wadh'},W2={seed:621,coat:'wadh',size:0.92},W3={seed:622,coat:'wadh',size:1.06};
     for(let i=0;i<46;i++){const a=wr()*6.283,r=3+wr()*16;put(hs,'camel',Math.cos(a)*r,Math.sin(a)*r,{over:[W1,W2,W3][i%3],wander:16,herd:h,rot:wr()*6,r:1.1});}
     {const r=2.0,c=Math.cos(r),s=Math.sin(r),lp=(x,z)=>[-9+x*c+z*s,6-x*s+z*c];   // site-local spots on the far side of the trough
-     [[-0.6,-9.85,0],[0.6,-9.9,0.1],[1.5,-9.7,0.3],[-1.5,-9.55,-0.35]].forEach(([x,z,d],i)=>{const [px,pz]=lp(x,z);put(K,'camel',px,pz,{over:[W1,W2,W3][i%3],rot:r+d,clip:'graze',r:1.1});});}
+     [[-0.6,-9.85,0],[0.6,-9.9,0.1],[1.5,-9.7,0.3],[-1.5,-9.55,-0.35]].forEach(([x,z,d],i)=>{const [px,pz]=lp(x,z+WD);put(K,'camel',px,pz,{over:[W1,W2,W3][i%3],rot:r+d,clip:'graze',r:1.1});});}
     put(hs,'shaib',-18,4,{over:{seed:623,bisht:'brown'},wander:20,herd:h,r:0.4});put(hs,'boy',16,-6,{over:{seed:624,headwear:'shemagh',agal:true},wander:20,herd:h,r:0.4});}
   // -- five horsemen roaming the open desert
   [[0,300,'bay'],[-320,-300,'grey'],[520,40,'black'],[-480,520,'chestnut'],[220,-520,'bay']].forEach(([x,z,coat],i)=>
