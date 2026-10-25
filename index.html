@@ -1571,10 +1571,12 @@ function useCar(m){
 // when the drive starts, swap the detailed car for the light one and free the detailed one
 function dropHQ(){const m=carModels.hq;if(!m)return;carModels.hq=null;if(carModels.light)useCar(carModels.light);
   body.remove(m);m.geometry.dispose();if(m.material.map)m.material.map.dispose();m.material.dispose();}
-loadCar('car').then(d=>{carModels.light=carMesh(d);if(!carModels.hq||game.mode==='play')useCar(carModels.light);else{carModels.light.visible=false;body.add(carModels.light);}})
+// title page shows only the original model; the light one waits hidden until driving starts (or the original fails to load)
+let origFailed=false;
+loadCar('car').then(d=>{carModels.light=carMesh(d);if(game.mode==='play'||origFailed)useCar(carModels.light);else{carModels.light.visible=false;body.add(carModels.light);}})
   .catch(e=>{console.warn('car model',e);if(!carModels.hq)showProcCar(true);});
 loadGLB('models/car_orig.glb').catch(()=>loadCarSplit('car_orig')).then(d=>{if(game.mode==='play'){d.g.dispose();return;}carModels.hq=carMesh(d);carModels.hq.material.map.anisotropy=8;useCar(carModels.hq);})
-  .catch(e=>console.warn('original car',e));
+  .catch(e=>{console.warn('original car',e);origFailed=true;if(carModels.light&&game.mode!=='play')useCar(carModels.light);});
 
 /* ---------------- loop ---------------- */
 let mapT=0,wT=0;
@@ -1588,6 +1590,7 @@ function worldTick(dt,now){
 /* title screen */
 document.body.classList.add('title');
 document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='title')return;game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();if(!station)tune(1); // radio starts with the same tap as the engine
+  if(!carModels.hq&&carModels.light)useCar(carModels.light); // original not ready yet: drive the light one
   
   if(snd.ctx&&snd.ctx.state==='suspended')snd.ctx.resume();});
 let last=performance.now(),acc=0,simT=0;
