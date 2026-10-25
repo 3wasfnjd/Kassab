@@ -140,6 +140,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <script src="aa/badia/badia.js"></script>
 <script src="aa/vehicles/vehicles.js"></script>
 <script src="aa/core/viewer-three.js"></script>
+<script src="aa/meshopt_simplifier.js"></script>
 <script>
 (function(){
 'use strict';
@@ -774,6 +775,9 @@ if(AAok){
   queueTotal=queue.length;
 }
 const buildEl=document.getElementById('build'),bpEl=document.getElementById('bp');
+// mesh simplifier (meshoptimizer, MIT) — used to thin out the merged settlement meshes
+let simpOK=false;try{window.MeshoptSimplifier&&MeshoptSimplifier.ready.then(()=>{simpOK=true;}).catch(()=>{});}catch(e){}
+const SIMP={tris0:0,tris1:0};
 // static batching: once a settlement is fully built, merge its non-animated meshes by material (far fewer draw calls)
 function batchGroup(grp){
   grp.updateMatrixWorld(true);const inv=new T.Matrix4().copy(grp.matrixWorld).invert(),buckets=new Map(),drop=[];
@@ -794,7 +798,11 @@ function batchGroup(grp){
           else if(n==='normal'){v.fromBufferAttribute(src,i).applyMatrix3(nm).normalize();dst.setXYZ(vo+i,v.x,v.y,v.z);}
           else for(let k=0;k<it;k++)dst.array[(vo+i)*it+k]=src.array[i*it+k];}});
       const si=g.index.array;for(let i=0;i<si.length;i++)idx[io+i]=si[i]+vo;vo+=c;io+=si.length;}
-    out.setIndex(new T.BufferAttribute(idx,1));out.computeBoundingSphere();
+    let fin=idx;
+    if(simpOK){try{const [r]=MeshoptSimplifier.simplify(idx,out.attributes.position.array,3,Math.floor(idx.length*0.4/3)*3,0.0025,['LockBorder']);
+      if(r.length<idx.length*0.92)fin=r;}catch(e){}}
+    SIMP.tris0+=idx.length/3;SIMP.tris1+=fin.length/3;
+    out.setIndex(new T.BufferAttribute(fin,1));out.computeBoundingSphere();
     const mesh=new T.Mesh(out,b.mat);mesh.castShadow=b.cast;mesh.receiveShadow=true;if(b.depth)mesh.customDepthMaterial=b.depth;grp.add(mesh);made++;
     b.list.forEach(e=>{});}
   // remove only meshes that went into a merged bucket
@@ -860,6 +868,7 @@ function stepActors(dt){
       else{const dx=a.tx-a.x,dz=a.tz-a.z,d=Math.hypot(dx,dz);
         if(d<0.3){a.wait=a.roam?1+Math.random()*3:a.herd?1+Math.random()*4:3+Math.random()*7;setTimeScale(a,1);AA.three.play(a.g,Math.random()<0.6?'graze':'idle');}
         else{const st=Math.min(d,a.speed*dt);a.x+=dx/d*st;a.z+=dz/d*st;const tr=Math.atan2(dx,dz);let dr=tr-a.rot;dr=Math.atan2(Math.sin(dr),Math.cos(dr));a.rot+=dr*Math.min(1,3*dt);}}}
+    const nearSh=d2<46*46;if(a.sh!==nearSh){a.sh=nearSh;a.g.traverse(o=>{if(o.isSkinnedMesh)o.castShadow=nearSh;});}
     a.g.position.set(a.x,H(a.x,a.z)+yOff,a.z);a.g.rotation.set(a.tilt||0,a.rot,0,'YXZ');
     a.col.x=a.x;a.col.z=a.z;
     if(d2<180*180&&a.g.userData.anim){a.g.userData.anim.mixer.update(dt);if(a.sub&&a.sub.userData.anim)a.sub.userData.anim.mixer.update(dt);}
@@ -1637,7 +1646,7 @@ function frame(now){
 }
 // test hook: advance simulation deterministically without rAF timing
 window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
-window.__world={queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
+window.__world={SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
 window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
 })();

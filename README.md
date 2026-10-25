@@ -28,6 +28,7 @@
 | `index.html` | اللعبة |
 | `lib/three.min.js` | محرك Three.js r149 (رخصة MIT في `lib/three-LICENSE.txt`) |
 | `aa/` | مولّدات الأصول من مستودع Aboden-Assets (نخيل، عمارة نجدية، بيت شعر، إبل، ناس، مركبات) |
+| `aa/meshopt_simplifier.js` | مبسّط المجسمات من meshoptimizer (رخصة MIT في `aa/meshopt-LICENSE.md`) يخفّف مجسمات المواقع بعد دمجها |
 | `fonts/` | خط Baloo Bhaijaan 2 (رخصة OFL في `fonts/OFL.txt`) |
 | `models/car.glb` | موديل الوانيت للعب (مخفّف: ٢٥ ألف مثلث، خامة ١٠٢٤، أقل من ١ ميقا) |
 | `models/car_orig.glb` | الموديل الأصلي كما هو، لشاشة البداية فقط (٥١١ ألف مثلث، خامة ٢٠٤٨، ١٧ ميقا) |
