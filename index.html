@@ -1446,7 +1446,7 @@ function stepCar(dt){
   const g=!S.air;
   let spin=0;
   if(g){
-    if(input.gas){const a=15*Math.max(0.15,1-vF/40);vF+=a*dt;if(vF<6)spin=1-vF/6;}
+    if(input.gas){const a=15*Math.max(0.15,1-vF/58);/* top speed on the flat ~120 km/h */vF+=a*dt;if(vF<6)spin=1-vF/6;}
     if(input.brake){if(vF>0.5)vF-=22*dt;else vF=Math.max(-11,vF-7*dt);}
     vF-=vF*0.18*dt+Math.sign(vF)*Math.min(Math.abs(vF),(input.gas?0.3:1.8)*dt);
     let grip=input.hand?1.1:(Math.abs(vS)>3.5?2.6:5.5);
