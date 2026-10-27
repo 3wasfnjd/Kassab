@@ -173,7 +173,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
   <div id="phTime">٠:٠٠</div><div id="phMsg"></div><div id="phFlash"></div>
 </div>
 <div id="phView" role="dialog" aria-label="معاينة"><div id="phMedia"></div><p id="phHint"></p>
-  <div class="row"><button id="phSave" class="main">حفظ</button><button id="phShare">مشاركة</button><button id="phClose">إغلاق</button></div></div>
+  <div class="row"><button id="phGal" class="main">حفظ في الاستديو</button><button id="phSave">حفظ كملف</button><button id="phClose">إغلاق</button></div></div>
 <div id="wxPanel" hidden>
   <h6>الطقس</h6>
   <div class="row" id="wxRow">
@@ -1997,10 +1997,14 @@ audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
   const view=$('phView'),media=$('phMedia');let cur=null;
   function showShot(blob,name){if(cur&&cur.url)URL.revokeObjectURL(cur.url);const url=URL.createObjectURL(blob),isV=/^video/.test(blob.type);cur={blob,name,url};
     media.innerHTML='';const el=document.createElement(isV?'video':'img');el.src=url;if(isV){el.controls=true;el.playsInline=true;el.loop=true;}media.appendChild(el);
-    $('phHint').textContent=isV?'«حفظ» ينزّل المقطع في مجلد التنزيلات (Downloads) — أو «مشاركة» وتختار حفظ الفيديو أو ترسله':'اضغط مطوّلاً على الصورة واختر «حفظ الصورة» لتنحفظ في الألبوم — أو «حفظ» تنزل في مجلد التنزيلات (Downloads)';
-    const f=new File([blob],name,{type:blob.type});$('phShare').style.display=(navigator.canShare&&navigator.canShare({files:[f]}))?'':'none';view.classList.add('on');}
+    $('phHint').textContent=isV?'«حفظ في الاستديو» يفتح قائمة الجوال: اختر «حفظ الفيديو»':'«حفظ في الاستديو» يفتح قائمة الجوال: اختر «حفظ الصورة» — أو اضغط مطوّلاً على الصورة';
+    view.classList.add('on');}
   $('phClose').addEventListener('click',()=>view.classList.remove('on'));
-  $('phShare').addEventListener('click',async()=>{if(!cur)return;try{await navigator.share({files:[new File([cur.blob],cur.name,{type:cur.blob.type})],title:'تطعيس كساب'});}catch(e){if(e&&e.name!=='AbortError')msg('المشاركة ما اشتغلت هنا — استخدم «حفظ»',3);}});
+  // a web page cannot write into the photo gallery itself: the phone's share sheet can (its «Save Image / Save Video»)
+  $('phGal').addEventListener('click',async()=>{if(!cur)return;const f=new File([cur.blob],cur.name,{type:cur.blob.type});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]});return;}catch(e){if(e&&e.name==='AbortError')return;}}
+    if(dl){try{await dl.save({filename:cur.name,data:cur.blob});msg('إذا طلعت لك القائمة اختر «حفظ الصورة/الفيديو» — وإلا تلقاه في التنزيلات وتطلع في الاستديو من مجلد Download',5);}catch(e){msg(e&&e.code==='declined'?'ما انحفظ':'ما قدرت أحفظ هنا',2.5);}return;}
+    saveBlob(cur.blob,cur.name);});
   $('phSave').addEventListener('click',()=>{if(cur)saveBlob(cur.blob,cur.name);});
   async function saveBlob(blob,name){if(dl){try{await dl.save({filename:name,data:blob});msg('انحفظ ✓ — تلقاه في مجلد التنزيلات (Downloads)',3.5);}catch(e){msg(e&&e.code==='declined'?'ما انحفظ':'ما قدرت أحفظ الملف هنا',2.5);}return;}
     const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);msg('بدأ التنزيل — تلقاه في مجلد التنزيلات (Downloads)',3.5);}
