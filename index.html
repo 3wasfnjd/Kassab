@@ -246,7 +246,7 @@ const SITES=[
   {id:'camp',   name:'مخيم البدو',  x:-600,z:-520, r0:24,r1:56, col:'#c9a27a'},
   {id:'souq',   name:'السوق',       x:483, z:-380, r0:34,r1:66, col:'#b5654a'},
   {id:'caravan',name:'الكرفان',     x:60,  z:-300, r0:30,r1:62, col:'#f3f1ea'},
-  {id:'city',   name:'المدينة',     x:640, z:60,   r0:72,r1:118,col:'#8d9096'}
+  {id:'city',   name:'المدينة',     x:640, z:60,   r0:96,r1:140,col:'#8d9096'}
 ];
 SITES.forEach(t=>t.h=base(t.x,t.z));
 SITES[5].h=SITES[1].h; // the souq shares the village's ground level so the two pads meet cleanly
@@ -255,7 +255,7 @@ const SPOTS=[[70,-60,0.6],[-200,40,2.2],[150,300,-0.4],[-540,-150,1.4],[300,-200
 const PANS=SPOTS.map(p=>({x:p[0],z:p[1],r0:8,r1:26,h:base(p[0],p[1])}));
 const ROADP=[[[CX,CZ],[160,-90],[300,-250],[368,-374],[399,-380]],[[CX,CZ],[90,200],[210,390],[300,520]],
   [[CX,CZ],[-180,90],[-330,200],[-470,260]],[[-470,260],[-560,-60],[-560,-330],[-600,-520]],
-  [[160,-90],[400,-10],[530,60],[574,60]]];   // the main road to the city's west arm (paved, see makeHighway)
+  [[160,-90],[400,-10],[495,60],[560,60]]];   // the main road to the city's west arm (paved, see makeHighway)
 const ROADS=[];ROADP.forEach(pl=>{for(let i=0;i<pl.length-1;i++)ROADS.push([pl[i][0],pl[i][1],pl[i+1][0],pl[i+1][1]]);});
 // the wadi: a dry valley from the north-west edge of the map down into a basin at the oasis
 const WADI=[[-1100,760],[-960,610],[-860,520],[-760,430],[-660,360],[-590,322],[-525,292]];
@@ -566,8 +566,8 @@ function roadTex(){ // one 12 m tile: asphalt, white edge lines, dashed lane lin
   [64,192].forEach(u=>{x.fillRect(u-2,0,4,200);x.fillRect(u-2,256,4,200);});
   x.fillStyle='#f2c23a';x.fillRect(122,0,4,512);x.fillRect(130,0,4,512);
   const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.wrapS=T.ClampToEdgeWrapping;t.wrapT=T.RepeatWrapping;t.anisotropy=4;return t;}
-function makeHighway(pts,W){ // a ribbon draped on the terrain along a smooth curve through the road points
-  const cv=new T.CatmullRomCurve3(pts.map(p=>new T.Vector3(p[0],0,p[1])),false,'centripetal'),L=cv.getLength(),n=Math.ceil(L/2.5);
+function makeHighway(pts,W,closed){ // a ribbon draped on the terrain along a smooth curve through the road points
+  const cv=new T.CatmullRomCurve3(pts.map(p=>new T.Vector3(p[0],0,p[1])),!!closed,'centripetal'),L=cv.getLength(),n=Math.ceil(L/2.5);
   const pos=[],uv=[],idx=[];
   for(let i=0;i<=n;i++){const u=i/n,p=cv.getPointAt(u),t=cv.getTangentAt(u),nx=-t.z,nz=t.x,v=u*L/12;
     for(const sd of [-1,1]){const x=p.x+nx*sd*W/2,z=p.z+nz*sd*W/2;pos.push(x,H(x,z)+0.07,z);uv.push(sd<0?0:1,v);}
@@ -825,7 +825,12 @@ if(AAok){
      [[-0.6,-9.85,0],[0.6,-9.9,0.1],[1.5,-9.7,0.3],[-1.5,-9.55,-0.35]].forEach(([x,z,d],i)=>{const [px,pz]=lp(x,z+WD);put(K,'camel',px,pz,{over:[W1,W2,W3][i%3],rot:r+d,clip:'graze',r:1.1});});}
     put(hs,'shaib',-18,4,{over:{seed:623,bisht:'brown'},wander:20,herd:h,r:0.4});put(hs,'boy',16,-6,{over:{seed:624,headwear:'shemagh',agal:true},wander:20,herd:h,r:0.4});}
   // -- the city (Aboden-Assets kit «المدينة» scene): a four-lane crossroads with shops, flats, a petrol station, villas, a mosque and a tower
-  scene.add(makeHighway([[CX,CZ],[160,-90],[400,-10],[530,60],[574,60]],13.6));
+  scene.add(makeHighway([[CX,CZ],[160,-90],[400,-10],[495,60],[560,60]],13.6));
+  {// ring road around the city: the four street arms (ending 66.8 m out) butt onto its inner edge
+   const C=SITES.find(t=>t.id==='city'),R=73.6,rc=22,pts=[];
+   for(const [cx,cz,a0] of [[R-rc,R-rc,0],[-(R-rc),R-rc,Math.PI/2],[-(R-rc),-(R-rc),Math.PI],[R-rc,-(R-rc),Math.PI*1.5]])
+     for(let i=0;i<=6;i++){const a=a0+i/6*Math.PI/2;pts.push([C.x+cx+Math.cos(a)*rc,C.z+cz+Math.sin(a)*rc]);}
+   scene.add(makeHighway(pts,13.6,true));}
   if(AA.assets.kit_intersection){const Cy=site('city');
     const CITY=[
       ['kit_intersection',0,[[0,0,0,{seed:1,lanes:'4',sidewalk:3}]]],
