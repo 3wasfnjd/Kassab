@@ -693,7 +693,7 @@ function makePonds(){const g0=new T.Group(),mat=new T.MeshStandardMaterial({colo
   for(const p of PONDS){const n=28,pos=[p.x,p.lvl,p.z],idx=[];for(let i=0;i<n;i++){const a=i/n*6.283,rr=p.r*(0.82+0.3*noise(p.x+Math.cos(a)*2,p.z+Math.sin(a)*2));pos.push(p.x+Math.cos(a)*rr,p.lvl,p.z+Math.sin(a)*rr);idx.push(0,1+(i+1)%n,1+i);}
     const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();const m=new T.Mesh(g,mat);m.renderOrder=1;g0.add(m);}
   return g0;}
-function makeRawdaFence(){ // square concrete blocks with a steel post every 4 m, three wire strands, a gap for cars facing Al Jubaylah
+function makeRawdaFence(){ // square concrete blocks with a steel post every 4 m, a gap for cars facing Al Jubaylah
   const pts=[],K=1.12,gapC=-Math.PI/2,gapHalf=7;let L=0,prev=null;
   for(let i=0;i<=1600;i++){const a=i/1600*Math.PI*2,x=RAWDA.x+Math.cos(a)*RAWDA.ex*K,z=RAWDA.z+Math.sin(a)*RAWDA.ez*K;if(prev)L+=Math.hypot(x-prev[0],z-prev[1]);prev=[x,z];pts.push([x,z,L,a]);}
   const gx=RAWDA.x,gz=RAWDA.z-RAWDA.ez*K,posts=[];let next=0;
@@ -701,10 +701,8 @@ function makeRawdaFence(){ // square concrete blocks with a steel post every 4 m
   const N=posts.length,blk=new T.InstancedMesh(new T.BoxGeometry(0.42,0.32,0.42),new T.MeshStandardMaterial({color:0xc9c4b8,roughness:0.9}),N),
     rod=new T.InstancedMesh(new T.CylinderGeometry(0.03,0.03,1.35,5),new T.MeshStandardMaterial({color:0x7d8287,metalness:0.6,roughness:0.45}),N),M=new T.Matrix4(),I=new T.Quaternion(),one=new T.Vector3(1,1,1),pp=new T.Vector3();
   const wires=[];posts.forEach(([x,z],i)=>{const y=H(x,z);blk.setMatrixAt(i,M.compose(pp.set(x,y+0.12,z),I,one));rod.setMatrixAt(i,M.compose(pp.set(x,y+0.28+0.67,z),I,one));staticC.push({x,z,r:0.32});
-    const nb=posts[(i+1)%N];if(Math.hypot(nb[0]-x,nb[1]-z)<5){const y2=H(nb[0],nb[1]);for(const hh of [0.55,0.9,1.25])wires.push(x,y+hh,z,nb[0],y2+hh,nb[1]);
-      const cx=(x+nb[0])/2,cz=(z+nb[1])/2,len=Math.hypot(nb[0]-x,nb[1]-z),rr=Math.atan2(nb[0]-x,nb[1]-z);staticB.push({x:cx,z:cz,hx:0.12,hz:len/2,c:Math.cos(rr),s:Math.sin(rr)});}});
+});   // posts only: a concrete block and a steel post, nothing strung between them
   blk.castShadow=false;const g=new T.Group();g.add(blk,rod);
-  const wg=new T.BufferGeometry();wg.setAttribute('position',new T.Float32BufferAttribute(wires,3));g.add(new T.LineSegments(wg,new T.LineBasicMaterial({color:0x5d6166,transparent:true,opacity:0.8})));
   // bigger concrete blocks either side of the car entrance
   [-1,1].forEach(sd=>{const x=gx+sd*gapHalf,z=gz;const b=new T.Mesh(new T.BoxGeometry(0.8,0.9,0.8),new T.MeshStandardMaterial({color:0xd6d1c4,roughness:0.85}));b.position.set(x,H(x,z)+0.45,z);g.add(b);staticC.push({x,z,r:0.6});});
   return g;}
