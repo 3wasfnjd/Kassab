@@ -191,6 +191,17 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <script src="aa/majlis/majlis.js"></script>
 <script src="aa/badia/badia.js"></script>
 <script src="aa/vehicles/vehicles.js"></script>
+<script src="aa/lowpoly/lp-schemas.js"></script>
+<script src="aa/lowpoly/lp-core.js"></script>
+<script src="aa/lowpoly/lp-characters.js"></script>
+<script src="aa/kit/kit-core.js"></script>
+<script src="aa/kit/kit-build.js"></script>
+<script src="aa/kit/kit-buildings.js"></script>
+<script src="aa/kit/kit-nature.js"></script>
+<script src="aa/kit/kit-people.js"></script>
+<script src="aa/kit/kit-props.js"></script>
+<script src="aa/kit/kit-street.js"></script>
+<script src="aa/kit/kit-vehicles.js"></script>
 <script src="aa/core/viewer-three.js"></script>
 <script src="aa/meshopt_simplifier.js"></script>
 <script>
@@ -234,7 +245,8 @@ const SITES=[
   {id:'badia',  name:'بيت الشعر',   x:300, z:520,  r0:32,r1:70, col:'#3a2e28'},
   {id:'camp',   name:'مخيم البدو',  x:-600,z:-520, r0:24,r1:56, col:'#c9a27a'},
   {id:'souq',   name:'السوق',       x:483, z:-380, r0:34,r1:66, col:'#b5654a'},
-  {id:'caravan',name:'الكرفان',     x:60,  z:-300, r0:30,r1:62, col:'#f3f1ea'}
+  {id:'caravan',name:'الكرفان',     x:60,  z:-300, r0:30,r1:62, col:'#f3f1ea'},
+  {id:'city',   name:'المدينة',     x:640, z:60,   r0:64,r1:112,col:'#8d9096'}
 ];
 SITES.forEach(t=>t.h=base(t.x,t.z));
 SITES[5].h=SITES[1].h; // the souq shares the village's ground level so the two pads meet cleanly
@@ -242,7 +254,8 @@ SITES[5].h=SITES[1].h; // the souq shares the village's ground level so the two 
 const SPOTS=[[70,-60,0.6],[-200,40,2.2],[150,300,-0.4],[-540,-150,1.4],[300,-200,2.8],[-90,420,0.2]];
 const PANS=SPOTS.map(p=>({x:p[0],z:p[1],r0:8,r1:26,h:base(p[0],p[1])}));
 const ROADP=[[[CX,CZ],[160,-90],[300,-250],[368,-374],[399,-380]],[[CX,CZ],[90,200],[210,390],[300,520]],
-  [[CX,CZ],[-180,90],[-330,200],[-470,260]],[[-470,260],[-560,-60],[-560,-330],[-600,-520]]];
+  [[CX,CZ],[-180,90],[-330,200],[-470,260]],[[-470,260],[-560,-60],[-560,-330],[-600,-520]],
+  [[160,-90],[400,-10],[590,60]]];   // desert road to the city's west arm
 const ROADS=[];ROADP.forEach(pl=>{for(let i=0;i<pl.length-1;i++)ROADS.push([pl[i][0],pl[i][1],pl[i+1][0],pl[i+1][1]]);});
 // the wadi: a dry valley from the north-west edge of the map down into a basin at the oasis
 const WADI=[[-1100,760],[-960,610],[-860,520],[-760,430],[-660,360],[-590,322],[-525,292]];
@@ -372,7 +385,7 @@ tMat.onBeforeCompile=(sh)=>{
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;')
     .replace('#include <begin_vertex>','#include <begin_vertex>\nvWP=(modelMatrix*vec4(transformed,1.0)).xyz;vWN=normalize(mat3(modelMatrix)*objectNormal);');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[13];uniform vec3 uSites[7];uniform float uCloud;uniform float uETime;uniform float uWet;uniform vec4 uWadi[6];uniform vec3 uLake;
+    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[15];uniform vec3 uSites[8];uniform float uCloud;uniform float uETime;uniform float uWet;uniform vec4 uWadi[6];uniform vec3 uLake;
     float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
       return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -387,9 +400,9 @@ tMat.onBeforeCompile=(sh)=>{
     diffuseColor.rgb*=mix(vec3(1.0),warm/0.86,smoothstep(0.2,0.6,slope)*0.45);
     diffuseColor.rgb=mix(diffuseColor.rgb*0.9,diffuseColor.rgb*pale/0.88,big);
     diffuseColor.rgb*=0.96+0.06*fine;
-    float rd2=1e9;for(int i=0;i<13;i++){vec4 r=uRoads[i];vec2 ab=r.zw-r.xy;float t=clamp(dot(vWP.xz-r.xy,ab)/dot(ab,ab),0.0,1.0);vec2 e=vWP.xz-r.xy-ab*t;rd2=min(rd2,dot(e,e));}
+    float rd2=1e9;for(int i=0;i<15;i++){vec4 r=uRoads[i];vec2 ab=r.zw-r.xy;float t=clamp(dot(vWP.xz-r.xy,ab)/dot(ab,ab),0.0,1.0);vec2 e=vWP.xz-r.xy-ab*t;rd2=min(rd2,dot(e,e));}
     float road=1.0-smoothstep(2.6,5.5,sqrt(rd2)+vn(vWP.xz*0.4)*1.5);
-    float pad=0.0;for(int i=0;i<7;i++){pad=max(pad,1.0-smoothstep(uSites[i].z*0.55,uSites[i].z*0.95,distance(vWP.xz,uSites[i].xy)+vn(vWP.xz*0.15)*6.0));}
+    float pad=0.0;for(int i=0;i<8;i++){pad=max(pad,1.0-smoothstep(uSites[i].z*0.55,uSites[i].z*0.95,distance(vWP.xz,uSites[i].xy)+vn(vWP.xz*0.15)*6.0));}
     float packed=max(road,pad*0.6);
     float rut=road*(0.5+0.5*sin(sqrt(rd2)*3.3));
     diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(0.86,0.8,0.74),packed*(0.55+0.25*rut));
@@ -784,6 +797,35 @@ if(AAok){
     {const r=2.0,c=Math.cos(r),s=Math.sin(r),lp=(x,z)=>[-9+x*c+z*s,6-x*s+z*c];   // site-local spots on the far side of the trough
      [[-0.6,-9.85,0],[0.6,-9.9,0.1],[1.5,-9.7,0.3],[-1.5,-9.55,-0.35]].forEach(([x,z,d],i)=>{const [px,pz]=lp(x,z+WD);put(K,'camel',px,pz,{over:[W1,W2,W3][i%3],rot:r+d,clip:'graze',r:1.1});});}
     put(hs,'shaib',-18,4,{over:{seed:623,bisht:'brown'},wander:20,herd:h,r:0.4});put(hs,'boy',16,-6,{over:{seed:624,headwear:'shemagh',agal:true},wander:20,herd:h,r:0.4});}
+  // -- the city (Aboden-Assets kit «المدينة» scene): a four-lane crossroads with shops, flats, a petrol station, villas, a mosque and a tower
+  if(AA.assets.kit_intersection){const Cy=site('city');
+    const CITY=[
+      ['kit_intersection',0,[[0,0,0,{seed:1,lanes:'4',sidewalk:3}]]],
+      ['kit_road',1,[[0,-19.8,0,{seed:2,lanes:'4',sidewalk:3,length:20}],[0,19.8,0],[19.8,0,Math.PI/2],[-19.8,0,Math.PI/2],[0,-39.8,0],[0,39.8,0],[39.8,0,Math.PI/2],[-39.8,0,Math.PI/2]]],
+      ['kit_apartment',0,[[-31,-17.5,0,{seed:3,floors:6}]]],
+      ['kit_shop',0,[[-19.5,-13.4,0,{seed:4}],[-13,-13.4,0,{seed:5,kind:'cafe',color:'white'}]]],
+      ['kit_gas_station',0,[[26,-25.2,-Math.PI/2,{seed:6,pumps:2}]]],
+      ['kit_villa',0,[[-20,21.5,Math.PI,{seed:7}],[-40,21.5,Math.PI,{seed:8,color:'white',accent:'wood',floors:1,width:11}]]],
+      ['kit_mosque_modern',0,[[22,23,Math.PI,{seed:9}]]],
+      ['kit_office_tower',0,[[-30,-48,0,{seed:10,floors:20}]]],
+      ['kit_street_lamp',1,[[8.3,-14,-Math.PI/2,{seed:11,height:8}],[-8.3,-24,Math.PI/2],[8.3,-34,-Math.PI/2],[-8.3,14,Math.PI/2],[8.3,24,-Math.PI/2],[-8.3,34,Math.PI/2],[14,8.3,Math.PI],[24,-8.3,0],[-14,-8.3,0],[-24,8.3,Math.PI],[34,8.3,Math.PI],[-34,-8.3,0]]],
+      ['kit_traffic_light',1,[[7.6,-7.6,Math.PI,{seed:12}],[-7.6,7.6,0],[7.6,7.6,Math.PI/2],[-7.6,-7.6,-Math.PI/2]]],
+      ['kit_sign',0,[[9,-18,Math.PI,{seed:13,type:'speed',speed:'60'}],[-9,18,0,{seed:14,type:'speed',speed:'60'}],[-18,-8.5,Math.PI/2,{seed:15,type:'parking'}],[18,9,-Math.PI/2,{seed:16,type:'warning'}],[9,-44,Math.PI,{seed:17,type:'direction'}]]],
+      ['kit_bus_stop',0,[[-28,8.1,Math.PI,{seed:18}]]],['kit_bench',0,[[-16,-8.6,0,{seed:19}]]],
+      ['kit_trash_bin',1,[[-11.5,-8.6,0,{seed:20}],[11.5,8.6,0],[8.6,30,0]]],['kit_hydrant',1,[[-8.6,-11,0,{seed:21}],[8.6,12,0]]],
+      ['kit_bollard',1,[[-7.4,-9.4,0,{seed:22}],[-9.4,-7.4,0],[7.4,9.4,0],[9.4,7.4,0]]],
+      ['kit_tree',1,[[-8.6,-30,0,{seed:23,kind:'tall',height:6}],[-8.6,-38,0],[8.6,20,0],[8.6,38,0],[-8.6,28,0],[28,8.6,0],[38,8.6,0],[-38,-8.6,0]]],
+      // parked cars along the kerbs (the gallery's driving cars stand still here)
+      ['kit_sedan',0,[[-5.1,30,Math.PI,{seed:26,color:'blue'}],[5.1,-30,0,{seed:27,livery:'police',color:'white'}],[-5.1,-42,Math.PI,{seed:24,color:'red'}],[5.1,44,0,{seed:25,livery:'taxi',color:'white'}],[30,-5.1,-Math.PI/2,{seed:40,color:'grey'}]]],
+      ['kit_suv',0,[[-25,13.65,0,{seed:29}],[-44,5.1,Math.PI/2,{seed:28,color:'white'}]]],['kit_pickup',0,[[44,5.1,-Math.PI/2,{seed:30,color:'grey',load:'boxes'}]]],
+      ['kit_bus',0,[[-30,5.1,-Math.PI/2,{seed:31}]]]];
+    for(const [id,shared,list] of CITY){let first={};list.forEach((it,i)=>{const ov=it[3]||(shared?first:{});if(i===0)first=ov;
+      const flat=/intersection|road|sign|bench|trash|hydrant|bollard/.test(id);put(Cy,id,it[0],it[1],{rot:it[2],over:ov,nocol:/intersection|road/.test(id)});});}
+    // people on the pavements
+    [[-9.4,-12,-9.4,-36,{seed:32}],[9.4,14,9.4,34,{seed:33,outfit:'thobe',head:'shemagh'}],[-12,-9.4,-38,-9.4,{seed:34,outfit:'abaya',head:'shayla',height:1.62}],[12,-9.4,36,-9.4,{seed:37,outfit:'sport',shirt:'#3f9b55',head:'cap'}]]
+      .forEach(([x1,z1,x2,z2,ov])=>put(Cy,'kit_person',x1,z1,{over:ov,walk:[x1,z1,x2,z2]}));
+    put(Cy,'kit_person',-26,9.0,{rot:Math.PI,over:{seed:35,outfit:'suit',shirt:'#2a2a2d',pants:'#2a2a2d'}});
+    put(Cy,'kit_person',-29,8.9,{rot:Math.PI,clip:'wave',over:{seed:36,head:'girlHair',shirt:'#e7849f',pants:'#2a2a2d',height:1.5}});}
   // -- five horsemen roaming the open desert
   [[0,300,'bay'],[-320,-300,'grey'],[520,40,'black'],[-480,520,'chestnut'],[220,-520,'bay']].forEach(([x,z,coat],i)=>
     put({x,z,group:scene,id:'riders'},'horse',0,0,{over:{seed:400+i,coat},rider:i%2?SH1:{seed:410+i,bisht:i%3?'black':'cream'},wander:220,roam:true,pace:2.2,rot:i,r:0.9}));

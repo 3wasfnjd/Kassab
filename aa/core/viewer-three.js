@@ -66,9 +66,11 @@ transformed.y += aFlutter*w*0.035*sin(uTime*9.0 + aPhase*5.0 + position.x*4.0 + 
   // خامات متحركة (جريان الماء)
   const flowing = [];
   const mixers = new Set();
+  const rotors = new Set(); // مراوح ومراوح الطائرات: تدور باستمرار حول محورها
   three.tick = function (t, dt) {
     for (const f of flowing) for (const m of f.maps) m.offset.set(f.v[0] * t, f.v[1] * t);
     if (dt) for (const m of mixers) m.update(dt);
+    if (dt) for (const r of rotors) r.mesh.rotation[r.axis] += r.speed * dt;
   };
   // مقاطع الحركة → AnimationClip (مرة لكل شكل)
   function toClips(out) {
@@ -151,6 +153,7 @@ transformed.y += aFlutter*w*0.035*sin(uTime*9.0 + aPhase*5.0 + position.x*4.0 + 
       geo.setIndex(new T.BufferAttribute(d.indices, 1));
       const m0 = d.material || {};
       if (m0.spin) geo.translate(-m0.spin.pivot[0], -m0.spin.pivot[1], -m0.spin.pivot[2]); // العجلات تدور حول محورها
+      else if (m0.rotor) geo.translate(-m0.rotor.pivot[0], -m0.rotor.pivot[1], -m0.rotor.pivot[2]);
       else if (m0.hinge) geo.translate(-m0.hinge.pivot[0], -m0.hinge.pivot[1], -m0.hinge.pivot[2]); // الأبواب تدور حول مفصّلها
       geo.computeBoundingSphere();
       geo.boundingSphere.radius += 1.2; // هامش لحركة الريح حتى لا يختفي الشكل عند حافة الشاشة
@@ -174,7 +177,7 @@ transformed.y += aFlutter*w*0.035*sin(uTime*9.0 + aPhase*5.0 + position.x*4.0 + 
       } else mat = three.addWind(new T.MeshStandardMaterial(opts));
       if (m.emissive) glowing.push({ mat, k: m.glow || 1 });
       const outline = three.style === 'toon' && !m.doubleSided && !NO_OUTLINE[m.kind] && m.opacity == null;
-      parts.push({ name, geo, mat, kind: m.kind, spin: m.spin || null, hinge: m.hinge || null, outline });
+      parts.push({ name, geo, mat, kind: m.kind, spin: m.spin || null, hinge: m.hinge || null, rotor: m.rotor || null, outline });
     }
     return { parts, triangles: out.triangles, meta: out.meta, skeleton: out.skeleton || null, clips: out.skeleton ? toClips(out) : null, clipNames: out.clips ? Object.keys(out.clips) : [] };
   };
@@ -216,6 +219,7 @@ transformed.y += aFlutter*w*0.035*sin(uTime*9.0 + aPhase*5.0 + position.x*4.0 + 
         const k = new T.Object3D(); k.position.set(p.spin.pivot[0], p.spin.pivot[1], p.spin.pivot[2]); k.add(mesh); grp.add(k);
         grp.userData.steer.push(k); grp.userData.spin.push({ mesh, r: p.spin.radius }); continue;
       }
+      if (p.rotor) { mesh.position.set(p.rotor.pivot[0], p.rotor.pivot[1], p.rotor.pivot[2]); const r = { mesh, axis: p.rotor.axis || 'y', speed: p.rotor.speed || 20 }; rotors.add(r); (grp.userData.rotors = grp.userData.rotors || []).push(r); }
       if (p.spin) { mesh.position.set(p.spin.pivot[0], p.spin.pivot[1], p.spin.pivot[2]); grp.userData.spin.push({ mesh, r: p.spin.radius }); }
       if (p.hinge) {
         let h = grp.userData.hinges[p.hinge.id];
@@ -232,7 +236,7 @@ transformed.y += aFlutter*w*0.035*sin(uTime*9.0 + aPhase*5.0 + position.x*4.0 + 
   three.steer = function (grp, deg) { for (const k of grp.userData.steer || []) k.rotation.y = deg * Math.PI / 180; };
   three.doors = function (grp, f) { for (const h of Object.values(grp.userData.hinges || {})) h.rotation.y = h.userData.hinge.sign * h.userData.hinge.max * f; };
 
-  three.release = function (grp) { if (!grp) return; grp.traverse(o => { if (o.userData && o.userData.anim) mixers.delete(o.userData.anim.mixer); }); };
+  three.release = function (grp) { if (!grp) return; grp.traverse(o => { if (o.userData && o.userData.anim) mixers.delete(o.userData.anim.mixer); if (o.userData && o.userData.rotors) for (const r of o.userData.rotors) rotors.delete(r); }); };
   // تدوير العجلات بعد قطع مسافة d
   three.roll = function (grp, d) { for (const w of grp.userData.spin || []) w.mesh.rotation.x += d / w.r; };
   three.dispose = function (built) {
