@@ -143,6 +143,10 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
     <button data-wx="auto" class="on"><i>⟳</i>تلقائي</button><button data-wx="clear"><i>☀</i>صحو</button><button data-wx="cloudy"><i>☁</i>غائم</button>
     <button data-wx="rain"><i>☂</i>مطر</button><button data-wx="haze"><i>≋</i>غبار</button><button data-wx="storm"><i>🌪</i>هبّة</button>
   </div>
+  <h6>الموسم</h6>
+  <div class="row" id="seasonRow">
+    <button data-season="auto" class="on"><i>⟳</i>تلقائي</button><button data-season="spring"><i>🌼</i>ربيع</button><button data-season="summer"><i>☀</i>صيف</button>
+  </div>
   <h6>الوقت</h6>
   <div class="row" id="dayRow">
     <button data-day="auto" class="on"><i>⟳</i>يمشي</button><button data-day="0.27"><i>🌅</i>شروق</button><button data-day="0.5"><i>☀</i>ظهر</button>
@@ -330,7 +334,7 @@ const camera=new T.PerspectiveCamera(42,1,0.5,1500);
 const hemi=new T.HemisphereLight(0xdfe6ee,0x9a7048,0.42);scene.add(hemi);
 const sun=new T.DirectionalLight(0xffe9cc,3.3);
 const SUN_DIR=new T.Vector3(-0.55,0.62,-0.58).normalize();
-const envU={cloud:{value:0},time:{value:0},wet:{value:0}};
+const envU={cloud:{value:0},time:{value:0},wet:{value:0},spring:{value:1}};
 sun.castShadow=true;
 sun.shadow.mapSize.set(1024,1024);
 const SC=sun.shadow.camera;SC.left=-48;SC.right=48;SC.top=48;SC.bottom=-48;SC.near=1;SC.far=260;
@@ -398,11 +402,11 @@ const tMat=new T.MeshStandardMaterial({color:0xcfa265,roughness:0.97,metalness:0
 tMat.shadowSide=T.BackSide; // lee faces cast, lit faces never self-shadow (no terminator acne)
 tMat.onBeforeCompile=(sh)=>{
   sh.uniforms.trailMap=trailU.map;sh.uniforms.trailC=trailU.c;
-  sh.uniforms.trailSize={value:TRAIL_SIZE};sh.uniforms.uRoads={value:ROADS.map(r=>new T.Vector4(r[0],r[1],r[2],r[3]))};sh.uniforms.uWet=envU.wet;sh.uniforms.uWadi={value:WSEG.map(g=>new T.Vector4(g.a[0],g.a[1],g.b[0],g.b[1]))};sh.uniforms.uLake={value:new T.Vector3(LAKE.x,LAKE.z,LAKE.r)};sh.uniforms.uCloud=envU.cloud;sh.uniforms.uETime=envU.time;sh.uniforms.uSites={value:SITES.map(t=>new T.Vector3(t.x,t.z,t.r0))};
+  sh.uniforms.trailSize={value:TRAIL_SIZE};sh.uniforms.uRoads={value:ROADS.map(r=>new T.Vector4(r[0],r[1],r[2],r[3]))};sh.uniforms.uWet=envU.wet;sh.uniforms.uSpring=envU.spring;sh.uniforms.uWadi={value:WSEG.map(g=>new T.Vector4(g.a[0],g.a[1],g.b[0],g.b[1]))};sh.uniforms.uLake={value:new T.Vector3(LAKE.x,LAKE.z,LAKE.r)};sh.uniforms.uCloud=envU.cloud;sh.uniforms.uETime=envU.time;sh.uniforms.uSites={value:SITES.map(t=>new T.Vector3(t.x,t.z,t.r0))};
   sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vWP;varying vec3 vWN;')
     .replace('#include <begin_vertex>','#include <begin_vertex>\nvWP=(modelMatrix*vec4(transformed,1.0)).xyz;vWN=normalize(mat3(modelMatrix)*objectNormal);');
   sh.fragmentShader=sh.fragmentShader.replace('#include <common>',`#include <common>
-    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[16];uniform vec3 uSites[8];uniform float uCloud;uniform float uETime;uniform float uWet;uniform vec4 uWadi[6];uniform vec3 uLake;
+    varying vec3 vWP;varying vec3 vWN;uniform sampler2D trailMap;uniform float trailSize;uniform vec2 trailC;uniform vec4 uRoads[16];uniform vec3 uSites[8];uniform float uCloud;uniform float uETime;uniform float uWet;uniform float uSpring;uniform vec4 uWadi[6];uniform vec3 uLake;
     float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
       return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
@@ -428,6 +432,12 @@ tMat.onBeforeCompile=(sh)=>{
     float silt=max(1.0-smoothstep(5.0,13.0,sqrt(wd2)+vn(vWP.xz*0.2)*4.0),1.0-smoothstep(uLake.z*0.6,uLake.z+6.0,distance(vWP.xz,uLake.xy)));
     float crack=smoothstep(0.42,0.5,abs(vn(vWP.xz*1.7)-0.5)+0.3);
     diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.36,0.27,0.18)*(0.9+0.1*crack),silt*0.7);
+    // spring (الربيع): rain-fed grass in patches on the flats between dunes, with specks of wild flowers
+    if(uSpring>0.01){float gN=vn(vWP.xz*0.035)*0.6+vn(vWP.xz*0.11)*0.4;
+      float green=uSpring*smoothstep(0.42,0.56,gN)*(1.0-smoothstep(0.22,0.5,slope))*(1.0-packed)*(1.0-tr*0.85);
+      vec3 gc=mix(vec3(0.11,0.21,0.04),vec3(0.24,0.33,0.08),vn(vWP.xz*0.6));
+      diffuseColor.rgb=mix(diffuseColor.rgb,gc*(0.8+0.4*fine),green*0.9);
+      float fl=step(0.9,vn(vWP.xz*2.7))*green;diffuseColor.rgb=mix(diffuseColor.rgb,mix(vec3(0.96,0.84,0.25),vec3(0.78,0.52,0.86),step(0.5,vn(vWP.xz*1.3+7.0))),fl*0.85);}
     diffuseColor.rgb*=1.0-uWet*(0.22+0.2*silt);
     if(uCloud>0.01){vec2 cp=vWP.xz*0.006+vec2(uETime*0.012,uETime*0.008);float cl=vn(cp)*0.65+vn(cp*2.3+3.1)*0.35;
       diffuseColor.rgb*=1.0-uCloud*0.45*smoothstep(0.45,0.7,cl);}`)
@@ -802,6 +812,7 @@ const PI=Math.PI;
 const builtCache={};window.__builtCache=builtCache;
 // the camera looks down from 25-30 m, so buildings, walls and parked vehicles lose detail nobody can see:
 // each static asset is simplified once, with the error measured against its own size (about 1% of it)
+// plants are left alone: simplifying fronds and leaves strips them bare
 const SIMP_CAT={architecture:1,souq:1,majlis:1,badia:1,vehicles:1,kit:1},ASSET_SIMP={tris0:0,tris1:0};
 function simplifyBuilt(b,cat){if(!window.__simpReady||b.skeleton||!SIMP_CAT[cat])return;
   for(const p of b.parts){const g=p.geo;if(!g.index||g.index.count<300)continue;if(p.spin||p.hinge)continue;
@@ -810,7 +821,10 @@ function simplifyBuilt(b,cat){if(!window.__simpReady||b.skeleton||!SIMP_CAT[cat]
       ASSET_SIMP.tris0+=idx.length/3;ASSET_SIMP.tris1+=(r.length<idx.length*0.92?r.length:idx.length)/3;
       if(r.length<idx.length*0.92)g.setIndex(new T.BufferAttribute(r,1));}catch(e){}}}
 window.__assetSimp=ASSET_SIMP;
-function getBuilt(id,over){const key=id+'|'+JSON.stringify(over||{});
+// palms and trees seen from above: fewer fronds and lighter crowns (the silhouette from the camera stays the same)
+const PLANT_CAP={palm:o=>({fronds:Math.min(o.fronds||28,16),dry:Math.min(o.dry==null?7:o.dry,3),bunches:Math.min(o.bunches==null?4:o.bunches,2)}),
+  sidr:o=>({density:Math.min(o.density||1,0.6)}),talh:o=>({density:Math.min(o.density||1,0.6)}),athl:o=>({density:Math.min(o.density||1,0.6)})};
+function getBuilt(id,over){if(PLANT_CAP[id])over=Object.assign({},over||{},PLANT_CAP[id](over||{}));const key=id+'|'+JSON.stringify(over||{});
   if(!builtCache[key]){const as=AA.assets[id];builtCache[key]=AA.three.build(as.generate(AA.params(as,over||{}),'low'),'low');simplifyBuilt(builtCache[key],as.category);}
   return builtCache[key];}
 function localAABB(b){if(b._box)return b._box;const bx=new T.Box3();b.parts.forEach(pt=>{pt.geo.computeBoundingBox();bx.union(pt.geo.boundingBox);});return(b._box=bx);}
@@ -943,9 +957,10 @@ if(AAok){
       qasr(112,-30,-Math.PI/2,370);   // east, gate facing the city
       qasr(-28,116,Math.PI,380);      // south, gate facing the city
       const HS=[{seed:390,width:8,depth:7,floors:1},{seed:391,width:9,depth:8,floors:2,roofRoom:true},{seed:392,width:7.5,depth:7,floors:1,worn:true,tower:true}];
-      [[104,22,-Math.PI/2],[118,40,-Math.PI/2],[104,56,-Math.PI/2],[114,70,-Math.PI/2],[100,-66,-Math.PI/2],[106,-82,-Math.PI/2],
-       [16,104,Math.PI],[30,118,Math.PI],[46,104,Math.PI],[-60,104,Math.PI],[-70,112,Math.PI]].forEach(([x,z,r],i)=>{
-        put(Cy,'najdi_house',x,z,{rot:r,over:HS[i%3]});if(i%2===0)put(Cy,'palm',x+(r===Math.PI?6:-6)*0+5,z+5,{over:{seed:395+i,height:7.5},rot:i});});}
+      // a compact mud quarter (حي) east of the ring: two rows of houses wall to wall, fronts on a 5 m lane (sikka)
+      {const LX=106,HW=2.5;for(const [row,r,sx] of [[0,Math.PI/2,-1],[1,-Math.PI/2,1]]){let z=-4;
+         for(let i=0;i<9;i++){const ov=HS[(i+row)%3],x=LX+sx*(HW+ov.depth/2);put(Cy,'najdi_house',x,z+ov.width/2,{rot:r,over:Object.assign({},ov,{seed:ov.seed+i*7+row*31})});z+=ov.width;}}
+       [[LX,-8],[LX,74]].forEach(([x,z],i)=>put(Cy,'palm',x,z,{over:{seed:396+i,height:8},rot:i}));}}
     // people on the pavements
     [[-9.4,-12,-9.4,-36,{seed:32}],[9.4,14,9.4,34,{seed:33,outfit:'thobe',head:'shemagh'}],[-12,-9.4,-38,-9.4,{seed:34,outfit:'abaya',head:'shayla',height:1.62}],[12,-9.4,36,-9.4,{seed:37,outfit:'sport',shirt:'#3f9b55',head:'cap'}]]
       .forEach(([x1,z1,x2,z2,ov])=>put(Cy,'kit_person',x1,z1,{over:ov,walk:[x1,z1,x2,z2]}));
@@ -1183,7 +1198,10 @@ function stepActors(dt){
 
 /* ---------------- day/night, weather, lights ---------------- */
 const DAY_LEN=600;                     // a full day in seconds
-const env={lock:null,dayLock:null,gust:0,day:0.36,wx:'clear',w:{clear:1,haze:0,storm:0,cloudy:0,rain:0},next:70,n:0,light:1,wadi:0,front:0,lake:0,wet:0,told:false};
+const env={season:'spring',seasonT:0,seasonLock:null,sIdx:1,lock:null,dayLock:null,gust:0,day:0.36,wx:'clear',w:{clear:1,haze:0,storm:0,cloudy:0,rain:0},next:70,n:0,light:1,wadi:0,front:0,lake:0,wet:0,told:false};
+const SEASON_LEN={spring:1800,summer:600},SEASON_NAME={spring:'ربيع',summer:'صيف'};
+// in spring every kind of weather comes round in turn: clear, cloud, rain, clear, dust, cloud, rain …
+const SPRING_SEQ=['clear','cloudy','rain','clear','haze','clear','cloudy','rain','haze'];
 const WX_NAME={clear:'صحو',haze:'غبار',storm:'عاصفة رملية',cloudy:'غائم',rain:'مطر'};
 const WX_SET={clear:{near:70,far:260,sun:1,wind:0.55,cloud:0,tint:[0,0,0]},haze:{near:35,far:170,sun:0.75,wind:0.9,cloud:0,tint:[0.02,-0.01,-0.05]},
   storm:{near:6,far:62,sun:0.32,wind:1.9,cloud:0.3,tint:[-0.06,-0.12,-0.2]},cloudy:{near:60,far:240,sun:0.55,wind:0.7,cloud:1,tint:[-0.05,-0.04,-0.02]},
@@ -1208,11 +1226,16 @@ function envTick(dt){
   if(env.dayLock==null)env.day=(env.day+dt/DAY_LEN)%1;
   else{let d=env.dayLock-env.day;d-=Math.round(d);env.day=((env.day+d*Math.min(1,dt*1.8))%1+1)%1;}   // ease to the chosen hour the short way round
   envU.time.value+=dt;
+  // seasons: a long spring (three days) then a short dry summer (one day), unless the panel pins one
+  if(env.seasonLock)env.season=env.seasonLock;
+  else if((env.seasonT+=dt)>SEASON_LEN[env.season]){env.seasonT=0;env.season=env.season==='spring'?'summer':'spring';env.next=Math.min(env.next,5);showToast(env.season==='spring'?'أقبل الربيع 🌼':'دخل الصيف',2.5);}
+  envU.spring.value+=((env.season==='spring'?1:0)-envU.spring.value)*Math.min(1,dt*0.08);
   // weather: player-picked state from the weather panel, a one-off gust, or drift between states every couple of minutes
   if(env.gust>0){env.gust-=dt;env.wx='storm';if(env.gust<=0){env.wx=env.lock||'clear';env.next=80+Math.random()*80;}}
   else if(env.lock){env.wx=env.lock;env.next=60;}
   else if((env.next-=dt)<=0&&env.wx==='storm'){env.wx='clear';env.next=80+Math.random()*80;}
-  else if(env.next<=0){const opts=(env.wx==='cloudy'?['rain','rain','clear']:['clear','clear','haze','cloudy','storm','rain']).filter(k=>k!==env.wx);env.wx=opts[Math.floor(Math.random()*opts.length)];
+  else if(env.next<=0){if(env.season==='spring'){env.wx=SPRING_SEQ[env.sIdx++%SPRING_SEQ.length];}
+    else{const opts=(env.wx==='cloudy'?['rain','clear']:['clear','clear','haze','haze','storm','cloudy']).filter(k=>k!==env.wx);env.wx=opts[Math.floor(Math.random()*opts.length)];}
     env.next=env.wx==='storm'?1.5:env.wx==='rain'?110+Math.random()*60:80+Math.random()*80;showToast(env.wx==='storm'?'هبّة رملية!':env.wx==='rain'?'بدأ المطر — راقب الوادي':WX_NAME[env.wx],2.5);}
   let near=0,far=0,sunK=0,wind=0,cloud=0,tint=[0,0,0];
   const wxRate=(env.wx==='storm'||env.w.storm>0.02)?2.4:0.12;for(const k in env.w){env.w[k]+=((k===env.wx?1:0)-env.w[k])*Math.min(1,dt*(k==='storm'?2.4:wxRate));const w=env.w[k],c=WX_SET[k];
@@ -1268,7 +1291,7 @@ function envTick(dt){
       stInit=true;stGeo.attributes.position.needsUpdate=true;stGeo.attributes.aAlpha.needsUpdate=true;}}
   // HUD clock
   const hrs=(env.day*24+24)%24,hh=Math.floor(hrs),mm=Math.floor((hrs-hh)*60/10)*10;
-  clkEl.textContent=(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);wxnEl.textContent=WX_NAME[env.wx];
+  clkEl.textContent=(String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]);wxnEl.textContent=SEASON_NAME[env.season]+' · '+WX_NAME[env.wx];
 }
 const clkEl=document.getElementById('clk'),wxnEl=document.getElementById('wxn'),toastEl=document.getElementById('toast');let toastT=0;
 const spdEl=document.getElementById('spd'),hud={P:document.getElementById('hP'),R:document.getElementById('hR'),S:document.getElementById('hS'),C:document.getElementById('hC'),WD:document.getElementById('hWD')};
@@ -1814,6 +1837,9 @@ audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
     if(k==='storm'){env.gust=1.5;showToast('هبّة رملية!',1.5);return;}
     mark(wxRow,b);if(k==='auto'){env.lock=null;env.next=60+Math.random()*60;showToast('الطقس تلقائي',1.5);}
     else{env.lock=k;env.wx=k;showToast(k==='rain'?'مطر — راقب الوادي':WX_NAME[k],1.5);}});
+  const seasonRow=document.getElementById('seasonRow');
+  seasonRow.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.season;mark(seasonRow,b);
+    if(k==='auto'){env.seasonLock=null;showToast('الموسم تلقائي',1.5);}else{env.seasonLock=k;env.season=k;env.next=Math.min(env.next,3);showToast(k==='spring'?'ربيع 🌼':'صيف',1.5);}});
   dayRow.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.day;mark(dayRow,b);
     env.dayLock=k==='auto'?null:+k;showToast(k==='auto'?'الوقت يمشي':b.lastChild.textContent.trim(),1.5);});}
 audio.addEventListener('error',()=>{});
