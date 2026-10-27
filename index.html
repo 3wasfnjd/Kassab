@@ -246,7 +246,7 @@ const SITES=[
   {id:'camp',   name:'مخيم البدو',  x:-600,z:-520, r0:24,r1:56, col:'#c9a27a'},
   {id:'souq',   name:'السوق',       x:483, z:-380, r0:34,r1:66, col:'#b5654a'},
   {id:'caravan',name:'الكرفان',     x:60,  z:-300, r0:30,r1:62, col:'#f3f1ea'},
-  {id:'city',   name:'المدينة',     x:640, z:60,   r0:106,r1:150,col:'#8d9096'}
+  {id:'city',   name:'الجبيلة',     x:640, z:60,   r0:136,r1:182,col:'#8d9096'}
 ];
 SITES.forEach(t=>t.h=base(t.x,t.z));
 SITES[5].h=SITES[1].h; // the souq shares the village's ground level so the two pads meet cleanly
@@ -565,6 +565,41 @@ function makeHose(pts){ // black rubber hose from the tanker valve, lying on the
   const cv=new T.CatmullRomCurve3(pts.map(p=>new T.Vector3(p[0],p[1],p[2])));
   const o=new T.Mesh(new T.TubeGeometry(cv,40,0.05,8,false),new T.MeshStandardMaterial({color:0x151515,roughness:0.7}));o.castShadow=true;return o;}
 
+/* ---------------- road signs to the city (green guide signs, Arabic first) ---------------- */
+const AR_D=n=>String(n).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[d]).replace('.','٫');
+function signCanvas(lines){ // lines: [{ar,en,dist,arrow}] or a welcome board
+  const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');
+  const draw=()=>{x.fillStyle='#0b6b3a';x.fillRect(0,0,1024,512);x.strokeStyle='#fff';x.lineWidth=14;x.strokeRect(22,22,980,468);
+    const F='"Baloo Bhaijaan 2","Noto Sans Arabic",Tahoma,sans-serif';x.fillStyle='#fff';x.textBaseline='middle';
+    if(lines.welcome){x.textAlign='center';x.font='800 92px '+F;x.fillText('مرحباً بكم في الجبيلة',512,200);x.font='700 70px '+F;x.fillText('Welcome to Al Jubaylah',512,350);}
+    else{const L=lines[0],m=L.dist,km=m<1000?null:(Math.round(m/100)/10).toFixed(1),dAr=km?AR_D(km)+' كم':AR_D(Math.max(100,Math.round(m/100)*100))+' م',dEn=km?km+' km':Math.max(100,Math.round(m/100)*100)+' m';
+      x.textAlign='right';x.font='800 150px '+F;x.fillText(L.ar,930,170);x.textAlign='left';x.font='700 70px '+F;x.fillText(L.en,94,170);
+      x.fillRect(60,262,904,6);x.textAlign='right';x.font='800 96px '+F;x.fillText(dAr,930,380);x.textAlign='left';x.font='700 76px '+F;x.fillText(dEn,94,380);
+      // arrow
+      x.save();x.translate(512,380);x.rotate(L.arrow||0);x.beginPath();x.moveTo(0,-62);x.lineTo(46,-8);x.lineTo(16,-8);x.lineTo(16,56);x.lineTo(-16,56);x.lineTo(-16,-8);x.lineTo(-46,-8);x.closePath();x.fill();x.restore();}
+    tex.needsUpdate=true;};
+  const tex=new T.CanvasTexture(c);tex.encoding=T.sRGBEncoding;tex.anisotropy=4;draw();
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);return tex;}
+function roadSign(x0,z0,face,tex,w){ // two posts and a board; face = direction the readable side looks toward
+  const g=new T.Group(),W=w||5,Hb=W/2,post=new T.MeshStandardMaterial({color:0x8d9399,metalness:0.6,roughness:0.4});
+  const pg=new T.CylinderGeometry(0.09,0.09,3.2+Hb,8);[-W*0.32,W*0.32].forEach(px=>{const p=new T.Mesh(pg,post);p.position.set(px,(3.2+Hb)/2,-0.16);g.add(p);});
+  const b=new T.Mesh(new T.PlaneGeometry(W,Hb),new T.MeshStandardMaterial({map:tex,roughness:0.55,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:0.12}));b.position.set(0,3.2+Hb/2,0);g.add(b);
+  const bk=new T.Mesh(new T.PlaneGeometry(W,Hb),new T.MeshStandardMaterial({color:0x9aa0a6,roughness:0.6}));bk.rotation.y=Math.PI;bk.position.set(0,3.2+Hb/2,-0.02);g.add(bk);
+  const rot=Math.atan2(face[0],face[1]);g.rotation.y=rot;g.position.set(x0,H(x0,z0),z0);
+  [-W*0.32,W*0.32].forEach(px=>staticC.push({x:x0+Math.cos(rot)*px,z:z0-Math.sin(rot)*px,r:0.25}));return g;}
+function placeCitySigns(){ // distances follow the asphalt to where the main road meets the ring
+  const cv=new T.CatmullRomCurve3(HWY_PTS.map(p=>new T.Vector3(p[0],0,p[1])),false,'centripetal'),L=cv.getLength();
+  const at=(u,side,dist)=>{const p=cv.getPointAt(u),t=cv.getTangentAt(u),rx=t.z,rz=-t.x;   // right-hand side for traffic heading to the city
+    scene.add(roadSign(p.x+rx*side,p.z+rz*side,[-t.x,-t.z],signCanvas([{ar:'الجبيلة',en:'Al Jubaylah',dist}])));};
+  [0.06,0.4,0.78].forEach(u=>at(u,10.5,(1-u)*L));
+  // the village branch: signs for drivers coming out of the village toward the main road
+  const cvv=new T.CatmullRomCurve3(VIL_PTS.map(p=>new T.Vector3(p[0],0,p[1])),false,'centripetal'),Lv=cvv.getLength();
+  let uj=0,bd=1e9;for(let i=0;i<=200;i++){const p=cv.getPointAt(i/200),d=Math.hypot(p.x-160,p.z+90);if(d<bd){bd=d;uj=i/200;}}
+  [0.85,0.35].forEach(u=>{const p=cvv.getPointAt(u),t=cvv.getTangentAt(u),rx=-t.z,rz=t.x;   // traffic runs against the curve here
+    scene.add(roadSign(p.x+rx*7.5,p.z+rz*7.5,[t.x,t.z],signCanvas([{ar:'الجبيلة',en:'Al Jubaylah',dist:u*Lv+(1-uj)*L}]),4.4));});
+  // welcome board where the main road reaches the ring
+  scene.add(roadSign(538,74,[-1,0],signCanvas({welcome:true}),6.4));}
+
 /* ---------------- city lawns ---------------- */
 let lawnMat=null;
 function makeLawn(x0,z0,w,d){ // a patch of irrigated grass draped on the ground (city parks and gardens)
@@ -842,6 +877,7 @@ if(AAok){
      [[-0.6,-9.85,0],[0.6,-9.9,0.1],[1.5,-9.7,0.3],[-1.5,-9.55,-0.35]].forEach(([x,z,d],i)=>{const [px,pz]=lp(x,z+WD);put(K,'camel',px,pz,{over:[W1,W2,W3][i%3],rot:r+d,clip:'graze',r:1.1});});}
     put(hs,'shaib',-18,4,{over:{seed:623,bisht:'brown'},wander:20,herd:h,r:0.4});put(hs,'boy',16,-6,{over:{seed:624,headwear:'shemagh',agal:true},wander:20,herd:h,r:0.4});}
   // -- the city (Aboden-Assets kit «المدينة» scene): a four-lane crossroads with shops, flats, a petrol station, villas, a mosque and a tower
+  placeCitySigns();
   scene.add(makeHighway(HWY_PTS,13.6));scene.add(makeHighway(VIL_PTS,8,false,2));
   scene.add(makeHighway(RING_PTS,13.6,true));   // ring road: the four street arms (ending 66.8 m out) butt onto its inner edge
   if(AA.assets.kit_intersection){const Cy=site('city');
@@ -885,6 +921,21 @@ if(AAok){
      L(-31,42,42,18);[[-14,40],[-26,46],[-38,40],[-50,46]].forEach(([x,z],i)=>put(Cy,i%2?'sidr':'palm',x,z,{over:i%2?{seed:330+i}:CP[i%3],rot:i}));
      L(23,44,26,14);[[13,44],[23,48],[33,44]].forEach(([x,z],i)=>put(Cy,'palm',x,z,{over:CP[i%3],rot:i*2}));
      L(-16,-46,9,34);[[-16,-34],[-16,-46],[-16,-58]].forEach(([x,z],i)=>put(Cy,i===1?'sidr':'palm',x,z,{over:i===1?{seed:340}:CP[i%3],rot:i}));}
+    // the old town on the outskirts: two walled mud palaces (qasr) and scattered Najdi mud houses outside the ring road
+    {const QT={seed:360,height:8,width:3.6},qasr=(qx,qz,r,sd)=>{const c=Math.cos(r),sn=Math.sin(r),P=(lx,lz)=>[qx+lx*c+lz*sn,qz-lx*sn+lz*c];
+        put(Cy,'najdi_house',...P(0,0),{rot:r,over:{seed:sd,width:14,depth:12,floors:2,roofRoom:true,tower:true}});
+        [[-13,-13],[13,-13],[-13,13],[13,13]].forEach(([x,z],i)=>put(Cy,'tower',...P(x,z),{rot:r+i*Math.PI/2,over:QT}));
+        put(Cy,'sur',...P(0,-13),{rot:r+Math.PI,over:{seed:sd+1,length:22}});
+        put(Cy,'sur',...P(-13,0),{rot:r-Math.PI/2,over:{seed:sd+2,length:22}});put(Cy,'sur',...P(13,0),{rot:r+Math.PI/2,over:{seed:sd+3,length:22}});
+        put(Cy,'sur',...P(-7.4,13),{rot:r,over:{seed:sd+4,length:7.6}});put(Cy,'sur',...P(7.4,13),{rot:r,over:{seed:sd+5,length:7.6}});
+        put(Cy,'gate',...P(0,13),{rot:r,over:{seed:sd+6,towers:false,height:4.6,gateWidth:3.2,open:1}});
+        [[-8,8],[8,8],[-8,-8]].forEach(([x,z],i)=>put(Cy,'palm',...P(x,z),{over:{seed:sd+10+i,height:8+i},rot:i}));};
+      qasr(112,-30,-Math.PI/2,370);   // east, gate facing the city
+      qasr(-28,116,Math.PI,380);      // south, gate facing the city
+      const HS=[{seed:390,width:8,depth:7,floors:1},{seed:391,width:9,depth:8,floors:2,roofRoom:true},{seed:392,width:7.5,depth:7,floors:1,worn:true,tower:true}];
+      [[104,22,-Math.PI/2],[118,40,-Math.PI/2],[104,56,-Math.PI/2],[114,70,-Math.PI/2],[100,-66,-Math.PI/2],[106,-82,-Math.PI/2],
+       [16,104,Math.PI],[30,118,Math.PI],[46,104,Math.PI],[-60,104,Math.PI],[-70,112,Math.PI]].forEach(([x,z,r],i)=>{
+        put(Cy,'najdi_house',x,z,{rot:r,over:HS[i%3]});if(i%2===0)put(Cy,'palm',x+(r===Math.PI?6:-6)*0+5,z+5,{over:{seed:395+i,height:7.5},rot:i});});}
     // people on the pavements
     [[-9.4,-12,-9.4,-36,{seed:32}],[9.4,14,9.4,34,{seed:33,outfit:'thobe',head:'shemagh'}],[-12,-9.4,-38,-9.4,{seed:34,outfit:'abaya',head:'shayla',height:1.62}],[12,-9.4,36,-9.4,{seed:37,outfit:'sport',shirt:'#3f9b55',head:'cap'}]]
       .forEach(([x1,z1,x2,z2,ov])=>put(Cy,'kit_person',x1,z1,{over:ov,walk:[x1,z1,x2,z2]}));
