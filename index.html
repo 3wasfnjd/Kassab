@@ -49,6 +49,27 @@ body.title .brand{width:84px}
 #wxPanel{position:fixed;top:calc(168px + env(safe-area-inset-top,0px));right:calc(62px + env(safe-area-inset-right,0px));width:min(250px,60vw);padding:10px 10px 8px;
   border-radius:16px;border:1.5px solid var(--rim);background:rgba(58,40,22,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff;direction:rtl;font:700 12px var(--font)}
 #wxPanel[hidden]{display:none}
+#camBtn{position:fixed;top:calc(214px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
+  border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
+#photoUI{position:fixed;inset:0;display:none;pointer-events:none;z-index:20;font:700 13px var(--font);color:#fff}
+body.photo #photoUI{display:block}
+body.photo .hud,body.photo #map,body.photo .pads,body.photo #steer,body.photo #wx,body.photo #reset,body.photo #radio,body.photo #wxBtn,body.photo #wxPanel,body.photo #camBtn,body.photo #rot,body.photo #toast,body.photo #vig,body.photo .brand{display:none!important}
+#photoUI button{pointer-events:auto;border:1.5px solid rgba(255,255,255,.55);background:rgba(30,22,14,.38);color:#fff;font:700 13px var(--font);padding:0;display:grid;place-items:center}
+#phTop{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;gap:6px;direction:rtl}
+#phTop button{height:34px;padding:0 14px;border-radius:17px}#phTop button.on{background:rgba(255,255,255,.9);color:#2a1d10;border-color:#fff}
+#phExit{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:38px;height:38px;border-radius:50%}
+#phLook{position:fixed;left:48%;right:0;top:0;bottom:0;pointer-events:auto;touch-action:none}
+#phStick{position:fixed;left:calc(26px + env(safe-area-inset-left,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.5);background:rgba(30,22,14,.25);pointer-events:auto;touch-action:none}
+#phKnob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(255,255,255,.85)}
+#phAlt{position:fixed;left:calc(164px + env(safe-area-inset-left,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px}
+#phAlt button{width:46px;height:46px;border-radius:50%;font-size:18px}
+#phShots{position:fixed;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:14px}
+#phShot{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.92)!important;border:5px solid rgba(255,255,255,.5)!important}
+#phRec{width:54px;height:54px;border-radius:50%}#phRec i{display:block;width:20px;height:20px;border-radius:50%;background:#e23b2e}#phRec.on i{border-radius:4px}
+#phTime{position:fixed;top:calc(54px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:#e23b2e;padding:3px 10px;border-radius:10px;font-variant-numeric:tabular-nums;display:none}
+#phMsg{position:fixed;top:calc(54px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:rgba(30,22,14,.55);padding:4px 12px;border-radius:12px;display:none;white-space:nowrap}
+#phFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
 #wxPanel h6{margin:2px 4px 6px;font:800 12px var(--font);opacity:.75}
 #wxPanel .row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
 #wxPanel button{height:44px;border-radius:11px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:700 12px var(--font);
@@ -107,7 +128,7 @@ body.title:not(.intro) #load{display:flex}
 @media (prefers-reduced-motion:reduce){#start.show{animation:none}}
 #start:active{transform:translateY(3px);box-shadow:0 1px 0 #a9773a}
 #start:focus-visible{outline:3px solid #fff;outline-offset:4px}
-body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build,body.title #wxBtn,body.title #wxPanel{display:none!important}
+body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build,body.title #wxBtn,body.title #wxPanel,body.title #camBtn{display:none!important}
 #err{position:fixed;inset:auto 16px 50% 16px;text-align:center;color:var(--ink);font-size:15px}
 </style>
 </head>
@@ -137,6 +158,16 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <button id="reset" aria-label="إعادة السيارة">↺</button>
 <button id="radio" aria-label="الراديو"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3" fill="currentColor"/><circle cx="17" cy="16" r="3" fill="currentColor"/></svg></button>
 <button id="wxBtn" aria-label="التحكم بالطقس"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="3.4"/><path d="M9 2.2v1.6M2.2 9h1.6M4.2 4.2l1.1 1.1M13.8 4.2l-1.1 1.1"/><path d="M8.5 19.5h9a3.3 3.3 0 0 0 .2-6.6 4.6 4.6 0 0 0-8.7 1.1 2.8 2.8 0 0 0-.5 5.5z" fill="rgba(0,0,0,.25)"/></svg></button>
+<button id="camBtn" aria-label="وضع التصوير"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg></button>
+<div id="photoUI" aria-label="وضع التصوير">
+  <div id="phLook"></div>
+  <div id="phTop"><button data-m="drone" class="on">درون</button><button data-m="cam">كاميرا</button></div>
+  <button id="phExit" aria-label="خروج">✕</button>
+  <div id="phStick"><div id="phKnob"></div></div>
+  <div id="phAlt"><button id="phUp" aria-label="فوق">▲</button><button id="phDn" aria-label="تحت">▼</button></div>
+  <div id="phShots"><button id="phRec" aria-label="تسجيل فيديو"><i></i></button><button id="phShot" aria-label="صورة"></button></div>
+  <div id="phTime">٠:٠٠</div><div id="phMsg"></div><div id="phFlash"></div>
+</div>
 <div id="wxPanel" hidden>
   <h6>الطقس</h6>
   <div class="row" id="wxRow">
@@ -1659,8 +1690,44 @@ document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
 document.addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault();},{passive:false});
 document.addEventListener('selectstart',e=>e.preventDefault());document.addEventListener('dragstart',e=>e.preventDefault());
 window.__autopilot=null; // test hook: fn(t) -> {steer,gas,brake,hand}
+/* ---------------- photo mode: a drone that takes off from the bonnet, or a tripod camera orbiting the car ---------------- */
+const PH={on:false,mode:'drone',x:0,y:0,z:0,yaw:0,pitch:-0.25,take:0,land:0,orb:{a:0,el:0.35,r:9},stick:{x:0,y:0},alt:0,rec:null};
+const drone=(()=>{const g=new T.Group(),dk=new T.MeshStandardMaterial({color:0x2b2e33,roughness:0.5,metalness:0.3}),lt=new T.MeshStandardMaterial({color:0xd9dde2,roughness:0.4});
+  const body=new T.Mesh(new T.BoxGeometry(0.26,0.08,0.34),lt);g.add(body);const cam=new T.Mesh(new T.SphereGeometry(0.05,10,8),dk);cam.position.set(0,-0.06,0.15);g.add(cam);
+  g.userData.props=[];[[1,1],[-1,1],[1,-1],[-1,-1]].forEach(([sx,sz])=>{const arm=new T.Mesh(new T.BoxGeometry(0.03,0.025,0.26),dk);arm.position.set(sx*0.13,0,sz*0.13);arm.rotation.y=sx*sz*0.8;g.add(arm);
+    const pr=new T.Mesh(new T.CylinderGeometry(0.11,0.11,0.006,14),new T.MeshBasicMaterial({color:0x111111,transparent:true,opacity:0.45}));pr.position.set(sx*0.22,0.05,sz*0.22);g.add(pr);g.userData.props.push(pr);
+    const led=new T.Mesh(new T.SphereGeometry(0.018,6,4),new T.MeshBasicMaterial({color:sz>0?0x33ff66:0xff3322}));led.position.set(sx*0.22,-0.02,sz*0.22);g.add(led);});
+  g.scale.setScalar(2.2);g.visible=false;scene.add(g);return g;})();
+function photoCam(dt){
+  const fx=Math.sin(S.h),fz=Math.cos(S.h);
+  if(PH.land>0){   // fly back to the bonnet, then hand the camera back to the game
+    PH.land-=dt;const k=Math.min(1,dt*3.2),hx=S.x+fx*2.4,hz=S.z+fz*2.4,hy=S.y+1.45;PH.x+=(hx-PH.x)*k;PH.y+=(hy-PH.y)*k;PH.z+=(hz-PH.z)*k;
+    drone.visible=true;drone.position.set(PH.x,PH.y,PH.z);drone.rotation.y=S.h;spinProps(dt);
+    camera.position.copy(camState.pos);camera.lookAt(camState.look);
+    if(PH.land<=0){drone.visible=false;PH.on=false;document.body.classList.remove('photo');resize();}return;}
+  if(PH.mode==='drone'){
+    if(PH.take<1){PH.take=Math.min(1,PH.take+dt/1.6);const e=PH.take*PH.take*(3-2*PH.take);   // lift off the bonnet, rise and back away to look at the car
+      const sx=S.x+fx*2.4,sz=S.z+fz*2.4,sy=S.y+1.45,ex=S.x+fx*9,ez=S.z+fz*9,ey=S.y+5.5;
+      PH.x=sx+(ex-sx)*e;PH.z=sz+(ez-sz)*e;PH.y=sy+(ey-sy)*e+Math.sin(e*Math.PI)*0.8;PH.yaw=S.h+Math.PI;PH.pitch=-0.35*e;
+      drone.visible=true;drone.position.set(PH.x,PH.y,PH.z);drone.rotation.y=S.h;spinProps(dt);
+      // watch the take-off from behind the car until the drone is up
+      const k=Math.min(1,PH.take*1.25);camera.position.lerpVectors(camState.pos,_p.set(PH.x,PH.y,PH.z),k*k);
+      if(k<1)camera.lookAt(_tl.set(PH.x,PH.y,PH.z));else setDroneView();return;}
+    drone.visible=false;
+    const sp=10*dt,cy=Math.cos(PH.yaw),sy=Math.sin(PH.yaw);
+    PH.x+=(sy*-PH.stick.y+cy*PH.stick.x)*sp;PH.z+=(cy*-PH.stick.y-sy*PH.stick.x)*sp;PH.y+=PH.alt*5*dt;
+    const dx=PH.x-S.x,dz=PH.z-S.z,d=Math.hypot(dx,dz);if(d>170){PH.x=S.x+dx/d*170;PH.z=S.z+dz/d*170;}   // stay where the world is loaded
+    PH.y=Math.max(H(PH.x,PH.z)+0.7,Math.min(S.y+120,PH.y));setDroneView();}
+  else{const o=PH.orb;o.a-=PH.stick.x*1.4*dt;o.el=Math.max(0.03,Math.min(1.45,o.el-PH.stick.y*0.9*dt));o.r=Math.max(3.5,Math.min(45,o.r*(1-PH.alt*1.2*dt)));
+    const ce=Math.cos(o.el);camera.position.set(S.x+Math.sin(o.a)*ce*o.r,Math.max(H(S.x,S.z)+0.4,S.y+1+Math.sin(o.el)*o.r),S.z+Math.cos(o.a)*ce*o.r);camera.lookAt(_tl.set(S.x,S.y+1,S.z));drone.visible=false;}}
+function setDroneView(){camera.position.set(PH.x,PH.y,PH.z);camera.lookAt(_tl.set(PH.x+Math.sin(PH.yaw)*Math.cos(PH.pitch),PH.y+Math.sin(PH.pitch),PH.z+Math.cos(PH.yaw)*Math.cos(PH.pitch)));}
+function spinProps(dt){drone.userData.props.forEach((p,i)=>p.rotation.y+=dt*(i%2?-60:60));}
+function enterPhoto(){if(PH.on||game.mode!=='play')return;PH.on=true;PH.take=0;PH.land=0;PH.mode='drone';PH.orb.a=Math.atan2(camState.pos.x-S.x,camState.pos.z-S.z);
+  document.body.classList.add('photo');document.querySelectorAll('#phTop button').forEach(b=>b.classList.toggle('on',b.dataset.m==='drone'));camera.fov=innerHeight>innerWidth?66:50;camera.updateProjectionMatrix();}
+function exitPhoto(){if(!PH.on||PH.land>0)return;if(PH.rec)stopRec();if(PH.mode==='drone'&&PH.take>=1){PH.land=1.1;camera.position.copy(camState.pos);}else{drone.visible=false;PH.on=false;document.body.classList.remove('photo');resize();}}
 function readInput(t){
   if(game.mode!=='play'&&!window.__autopilot){input.steer=0;input.gas=0;input.brake=0;input.hand=false;return;}
+  if(PH.on){input.steer=0;input.gas=0;input.brake=(S.vF||0)>0.5?1:0;input.hand=false;return;}   // photo mode: the car brakes to a stop (never reverses)
   if(window.__autopilot){Object.assign(input,window.__autopilot(t));return;}
   let s=touchSteer.val;if(keys.ArrowLeft||keys.KeyA)s=-1;if(keys.ArrowRight||keys.KeyD)s=1;
   input.steer+= (s-input.steer)*0.25;
@@ -1863,6 +1930,7 @@ function updateVisual(dt){
       camera.lookAt(_p.copy(tl).lerp(camState.look,e));
       if(k>=1){game.mode='play';document.body.classList.remove('title','intro');dropHQ();pixelRatio=PLAY_PR;renderer.setPixelRatio(pixelRatio);resize();}}
   }
+  if(PH.on)photoCam(dt);
   skyDome.position.copy(camera.position);
   // sun + shadow box follow car
   sun.position.set(S.x+SUN_DIR.x*120,S.y+SUN_DIR.y*120,S.z+SUN_DIR.z*120);sun.target.position.set(S.x,S.y,S.z);
@@ -1899,6 +1967,54 @@ function tune(k){station=k;radioEl.classList.toggle('on',k>0);
   if(pr&&pr.catch)pr.catch(()=>{});}
 radioEl.addEventListener('click',()=>tune(station?0:lastSong%RADIO.length+1));
 audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
+// photo mode controls, photos and video clips
+{const $=id=>document.getElementById(id),msg=(t,sec)=>{const m=$('phMsg');m.textContent=t;m.style.display='block';clearTimeout(msg.t);msg.t=setTimeout(()=>m.style.display='none',(sec||2)*1000);};
+  $('camBtn').addEventListener('click',enterPhoto);$('phExit').addEventListener('click',exitPhoto);
+  document.querySelectorAll('#phTop button').forEach(b=>b.addEventListener('click',()=>{if(PH.land>0)return;PH.mode=b.dataset.m;document.querySelectorAll('#phTop button').forEach(x=>x.classList.toggle('on',x===b));
+    if(PH.mode==='drone'&&PH.take<1)PH.take=0;}));
+  // left stick: move (drone) or orbit (camera)
+  const st=$('phStick'),kn=$('phKnob');let sid=null,c0=null;
+  const setK=(x,y)=>{PH.stick.x=x;PH.stick.y=y;kn.style.transform=`translate(${x*36}px,${y*36}px)`;};
+  st.addEventListener('pointerdown',e=>{sid=e.pointerId;const r=st.getBoundingClientRect();c0=[r.left+r.width/2,r.top+r.height/2];st.setPointerCapture(sid);e.preventDefault();});
+  st.addEventListener('pointermove',e=>{if(e.pointerId!==sid)return;let x=(e.clientX-c0[0])/48,y=(e.clientY-c0[1])/48;const l=Math.hypot(x,y);if(l>1){x/=l;y/=l;}setK(x,y);});
+  const endS=()=>{sid=null;setK(0,0);};st.addEventListener('pointerup',endS);st.addEventListener('pointercancel',endS);
+  // drag on the right half: look around (drone) or orbit (camera)
+  const lk=$('phLook');let lid=null,lp=null;
+  lk.addEventListener('pointerdown',e=>{lid=e.pointerId;lp=[e.clientX,e.clientY];lk.setPointerCapture(lid);e.preventDefault();});
+  lk.addEventListener('pointermove',e=>{if(e.pointerId!==lid)return;const dx=e.clientX-lp[0],dy=e.clientY-lp[1];lp=[e.clientX,e.clientY];
+    if(PH.mode==='drone'){PH.yaw-=dx*0.006;PH.pitch=Math.max(-1.45,Math.min(0.6,PH.pitch-dy*0.005));}else{PH.orb.a-=dx*0.008;PH.orb.el=Math.max(0.03,Math.min(1.45,PH.orb.el+dy*0.006));}});
+  const endL=()=>{lid=null;};lk.addEventListener('pointerup',endL);lk.addEventListener('pointercancel',endL);
+  // up/down: altitude (drone) or zoom (camera)
+  [['phUp',1],['phDn',-1]].forEach(([id,v])=>{const b=$(id),up=()=>{PH.alt=0;};b.addEventListener('pointerdown',e=>{PH.alt=v;b.setPointerCapture(e.pointerId);e.preventDefault();});b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);});
+  // saving: through the claude.ai download prompt when the page runs there, otherwise a normal browser download
+  let dl=null;try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(d=>{dl=d;}).catch(()=>{});}catch(e){}
+  const stamp=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());};
+  async function saveBlob(blob,name){if(dl){try{await dl.save({filename:name,data:blob});msg('تم الحفظ ✓');}catch(e){msg(e&&e.code==='declined'?'ما انحفظ':'ما قدرت أحفظ الملف',2.5);}return;}
+    const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),30000);msg('تم الحفظ ✓');}
+  const logo=document.querySelector('.brand');
+  $('phShot').addEventListener('click',()=>{if(PH.land>0)return;   // render once at a higher pixel ratio, stamp the logo, save a jpg
+    const pr=renderer.getPixelRatio(),hi=Math.min(2.5,Math.max(pr,devicePixelRatio||1));renderer.setPixelRatio(hi);renderer.render(scene,camera);
+    const src=renderer.domElement,c=document.createElement('canvas');c.width=src.width;c.height=src.height;const x=c.getContext('2d');x.drawImage(src,0,0);
+    renderer.setPixelRatio(pr);resize();
+    if(logo&&logo.complete&&logo.naturalWidth){const w=c.width*0.09,h=w*logo.naturalHeight/logo.naturalWidth;x.globalAlpha=0.85;x.drawImage(logo,c.width-w-c.width*0.025,c.height-h-c.width*0.025,w,h);}
+    const f=$('phFlash');f.style.opacity=0.85;setTimeout(()=>f.style.opacity=0,90);
+    c.toBlob(b=>{if(b)saveBlob(b,'kassab-'+stamp()+'.jpg');},'image/jpeg',0.93);});
+  // video: the 3D view plus the car and the radio, up to 60 s
+  let recT0=0,recTimer=null;
+  window.stopRec=function(){if(!PH.rec)return;try{PH.rec.stop();}catch(e){}};
+  $('phRec').addEventListener('click',()=>{if(PH.rec){stopRec();return;}
+    if(!window.MediaRecorder||!renderer.domElement.captureStream){msg('الجهاز ما يدعم تسجيل الفيديو',2.5);return;}
+    const vs=renderer.domElement.captureStream(30),tracks=[...vs.getVideoTracks()];
+    try{if(snd.ctx){if(!snd.recDest){snd.recDest=snd.ctx.createMediaStreamDestination();snd.out.connect(snd.recDest);
+        try{const rs=snd.ctx.createMediaElementSource(audio);rs.connect(snd.ctx.destination);rs.connect(snd.recDest);}catch(e){}}
+      tracks.push(...snd.recDest.stream.getAudioTracks());}}catch(e){}
+    const types=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'],mt=types.find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
+    let rec;try{rec=new MediaRecorder(new MediaStream(tracks),mt?{mimeType:mt,videoBitsPerSecond:8e6}:{});}catch(e){msg('ما قدرت أبدأ التسجيل',2.5);return;}
+    const parts=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)parts.push(e.data);};
+    rec.onstop=()=>{clearInterval(recTimer);$('phTime').style.display='none';$('phRec').classList.remove('on');PH.rec=null;
+      const type=rec.mimeType||mt||'video/webm',ext=/mp4/.test(type)?'mp4':'webm';if(parts.length)saveBlob(new Blob(parts,{type}),'kassab-'+stamp()+'.'+ext);};
+    rec.start(500);PH.rec=rec;recT0=performance.now();$('phRec').classList.add('on');$('phTime').style.display='block';
+    recTimer=setInterval(()=>{const s=(performance.now()-recT0)/1000|0;$('phTime').textContent=AR(Math.floor(s/60))+':'+AR(String(s%60).padStart(2,'0'));if(s>=60)stopRec();},250);});}
 // weather panel: a small icon opens it; weather and time of day can be pinned or left automatic
 {const btn=document.getElementById('wxBtn'),pan=document.getElementById('wxPanel'),wxRow=document.getElementById('wxRow'),dayRow=document.getElementById('dayRow');
   const open=v=>{pan.hidden=!v;btn.classList.toggle('on',v);};
