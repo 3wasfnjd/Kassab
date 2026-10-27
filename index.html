@@ -171,7 +171,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <button id="camBtn" aria-label="وضع التصوير"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg></button>
 <div id="photoUI" aria-label="وضع التصوير">
   <div id="phLook"></div>
-  <div id="phTop"><button data-m="drone" class="on">درون</button><button data-m="cam">كاميرا</button></div>
+  <div id="phTop"><button data-m="drone" class="on">درون</button><button data-m="cam">كاميرا</button><button id="phFreeze" class="on" aria-label="تجميد اللقطة">⏸ تجميد</button></div>
   <button id="phExit" aria-label="خروج">✕</button>
   <div id="phStick"><div id="phKnob"></div></div>
   <div id="phAlt"><button id="phUp" aria-label="فوق">▲</button><button id="phDn" aria-label="تحت">▼</button></div>
@@ -1701,7 +1701,7 @@ document.addEventListener('wheel',e=>{if(e.ctrlKey)e.preventDefault();},{passive
 document.addEventListener('selectstart',e=>e.preventDefault());document.addEventListener('dragstart',e=>e.preventDefault());
 window.__autopilot=null; // test hook: fn(t) -> {steer,gas,brake,hand}
 /* ---------------- photo mode: a drone that takes off from the bonnet, or a tripod camera orbiting the car ---------------- */
-const PH={on:false,mode:'drone',x:0,y:0,z:0,yaw:0,pitch:-0.25,take:0,land:0,orb:{a:0,el:0.35,r:9},stick:{x:0,y:0},alt:0,rec:null};
+const PH={on:false,freeze:true,mode:'drone',x:0,y:0,z:0,yaw:0,pitch:-0.25,take:0,land:0,orb:{a:0,el:0.35,r:9},stick:{x:0,y:0},alt:0,rec:null};
 const drone=(()=>{const g=new T.Group(),dk=new T.MeshStandardMaterial({color:0x2b2e33,roughness:0.5,metalness:0.3}),lt=new T.MeshStandardMaterial({color:0xd9dde2,roughness:0.4});
   const body=new T.Mesh(new T.BoxGeometry(0.26,0.08,0.34),lt);g.add(body);const cam=new T.Mesh(new T.SphereGeometry(0.05,10,8),dk);cam.position.set(0,-0.06,0.15);g.add(cam);
   g.userData.props=[];[[1,1],[-1,1],[1,-1],[-1,-1]].forEach(([sx,sz])=>{const arm=new T.Mesh(new T.BoxGeometry(0.03,0.025,0.26),dk);arm.position.set(sx*0.13,0,sz*0.13);arm.rotation.y=sx*sz*0.8;g.add(arm);
@@ -1714,7 +1714,7 @@ function photoCam(dt){
     PH.land-=dt;const k=Math.min(1,dt*3.2),hx=S.x+fx*2.4,hz=S.z+fz*2.4,hy=S.y+1.45;PH.x+=(hx-PH.x)*k;PH.y+=(hy-PH.y)*k;PH.z+=(hz-PH.z)*k;
     drone.visible=true;drone.position.set(PH.x,PH.y,PH.z);drone.rotation.y=S.h;spinProps(dt);
     camera.position.copy(camState.pos);camera.lookAt(camState.look);
-    if(PH.land<=0){drone.visible=false;PH.on=false;document.body.classList.remove('photo');resize();}return;}
+    if(PH.land<=0){drone.visible=false;PH.on=false;PH.freeze=true;document.body.classList.remove('photo');resize();}return;}
   if(PH.mode==='drone'){
     if(PH.take<1){PH.take=Math.min(1,PH.take+dt/1.6);const e=PH.take*PH.take*(3-2*PH.take);   // lift off the bonnet, rise and back away to look at the car
       const sx=S.x+fx*2.4,sz=S.z+fz*2.4,sy=S.y+1.45,ex=S.x+fx*9,ez=S.z+fz*9,ey=S.y+5.5;
@@ -1732,9 +1732,12 @@ function photoCam(dt){
     const ce=Math.cos(o.el);camera.position.set(S.x+Math.sin(o.a)*ce*o.r,Math.max(H(S.x,S.z)+0.4,S.y+1+Math.sin(o.el)*o.r),S.z+Math.cos(o.a)*ce*o.r);camera.lookAt(_tl.set(S.x,S.y+1,S.z));drone.visible=false;}}
 function setDroneView(){camera.position.set(PH.x,PH.y,PH.z);camera.lookAt(_tl.set(PH.x+Math.sin(PH.yaw)*Math.cos(PH.pitch),PH.y+Math.sin(PH.pitch),PH.z+Math.cos(PH.yaw)*Math.cos(PH.pitch)));}
 function spinProps(dt){drone.userData.props.forEach((p,i)=>p.rotation.y+=dt*(i%2?-60:60));}
-function enterPhoto(){if(PH.on||game.mode!=='play')return;PH.on=true;PH.take=0;PH.land=0;PH.mode='drone';PH.orb.a=Math.atan2(camState.pos.x-S.x,camState.pos.z-S.z);
+function setFreeze(v){PH.freeze=v;const b=document.getElementById('phFreeze');if(b){b.classList.toggle('on',v);b.textContent=v?'⏸ تجميد':'▶ متحرك';}
+  if(snd.out&&snd.ctx)snd.out.gain.setTargetAtTime(v&&PH.on?0.12:0.9,snd.ctx.currentTime,0.15);}
+function frozen(){return PH.on&&PH.freeze;}
+function enterPhoto(){if(PH.on||game.mode!=='play')return;PH.on=true;setFreeze(true);PH.take=0;PH.land=0;PH.mode='drone';PH.orb.a=Math.atan2(camState.pos.x-S.x,camState.pos.z-S.z);
   document.body.classList.add('photo');document.querySelectorAll('#phTop button').forEach(b=>b.classList.toggle('on',b.dataset.m==='drone'));camera.fov=innerHeight>innerWidth?66:50;camera.updateProjectionMatrix();}
-function exitPhoto(){if(!PH.on||PH.land>0)return;if(PH.rec)stopRec();if(PH.mode==='drone'&&PH.take>=1){PH.land=1.1;camera.position.copy(camState.pos);}else{drone.visible=false;PH.on=false;document.body.classList.remove('photo');resize();}}
+function exitPhoto(){if(!PH.on||PH.land>0)return;if(PH.rec)stopRec();setFreeze(false);PH.freeze=false;if(PH.mode==='drone'&&PH.take>=1){PH.land=1.1;camera.position.copy(camState.pos);}else{drone.visible=false;PH.on=false;PH.freeze=true;document.body.classList.remove('photo');resize();}}
 function readInput(t){
   if(game.mode!=='play'&&!window.__autopilot){input.steer=0;input.gas=0;input.brake=0;input.hand=false;return;}
   if(PH.on){input.steer=0;input.gas=0;input.brake=(S.vF||0)>0.5?1:0;input.hand=false;return;}   // photo mode: the car brakes to a stop (never reverses)
@@ -1916,7 +1919,7 @@ function updateVisual(dt){
   const lean=Math.max(-0.09,Math.min(0.09,-(S.vS||0)*0.012-S.yaw*(S.vF||0)*0.004));
   body.rotation.z+=(lean-body.rotation.z)*Math.min(1,8*dt);
   body.rotation.x+=((input.gas&&!S.air?-0.025:0)+(input.brake?0.035:0)-body.rotation.x)*Math.min(1,6*dt);
-  wheels.forEach(w=>{if(w.front)w.piv.rotation.y=-input.steer*0.5;w.w.rotation.x+=(S.vF||0)*dt/0.47;});
+  wheels.forEach(w=>{if(w.front)w.piv.rotation.y=-input.steer*0.5;w.w.rotation.x+=frozen()?0:(S.vF||0)*dt/0.47;});
   // camera: high, angled, lazily follows travel direction
   const sp=S.spd;
   if(sp>4){const vyaw=Math.atan2(S.vx,S.vz);let d=vyaw-camState.yaw;d=Math.atan2(Math.sin(d),Math.cos(d));camState.yaw+=d*Math.min(1,0.9*dt);}
@@ -1979,7 +1982,7 @@ radioEl.addEventListener('click',()=>tune(station?0:lastSong%RADIO.length+1));
 audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
 // photo mode controls, photos and video clips
 {const $=id=>document.getElementById(id),msg=(t,sec)=>{const m=$('phMsg');m.textContent=t;m.style.display='block';clearTimeout(msg.t);msg.t=setTimeout(()=>m.style.display='none',(sec||2)*1000);};
-  $('camBtn').addEventListener('click',enterPhoto);$('phExit').addEventListener('click',exitPhoto);
+  $('camBtn').addEventListener('click',enterPhoto);$('phFreeze').addEventListener('click',()=>setFreeze(!PH.freeze));$('phExit').addEventListener('click',exitPhoto);
   document.querySelectorAll('#phTop button').forEach(b=>b.addEventListener('click',()=>{if(PH.land>0)return;PH.mode=b.dataset.m;document.querySelectorAll('#phTop button').forEach(x=>x.classList.toggle('on',x===b));
     if(PH.mode==='drone'&&PH.take<1)PH.take=0;}));
   // left stick: move (drone) or orbit (camera)
@@ -2252,6 +2255,7 @@ let last=performance.now(),acc=0,simT=0;
 window.__state=S;window.__dbg={sun,tMat,renderer,scene,dust,hemi,car,camera};
 function frame(now){
   const dt=Math.min(0.1,(now-last)/1000);last=now;acc+=dt;
+  if(frozen()){acc=0;updateVisual(dt);updateChunks(S.x,S.z,1);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}renderer.render(scene,camera);if(!window.__autopilot)adapt(dt);requestAnimationFrame(frame);return;}
   readInput(simT);
   let steps=0;while(acc>=DT&&steps<5){stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);acc-=DT;simT+=DT;steps++;}
   if(steps===5)acc=0;
@@ -2263,7 +2267,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 // test hook: advance simulation deterministically without rAF timing
-window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
+window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){if(frozen()){updateVisual(DT);continue;}readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
 window.__world={PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
 window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
