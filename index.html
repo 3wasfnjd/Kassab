@@ -246,7 +246,7 @@ const SITES=[
   {id:'camp',   name:'مخيم البدو',  x:-600,z:-520, r0:24,r1:56, col:'#c9a27a'},
   {id:'souq',   name:'السوق',       x:483, z:-380, r0:34,r1:66, col:'#b5654a'},
   {id:'caravan',name:'الكرفان',     x:60,  z:-300, r0:30,r1:62, col:'#f3f1ea'},
-  {id:'city',   name:'المدينة',     x:640, z:60,   r0:96,r1:140,col:'#8d9096'}
+  {id:'city',   name:'المدينة',     x:640, z:60,   r0:106,r1:150,col:'#8d9096'}
 ];
 SITES.forEach(t=>t.h=base(t.x,t.z));
 SITES[5].h=SITES[1].h; // the souq shares the village's ground level so the two pads meet cleanly
@@ -257,6 +257,19 @@ const ROADP=[[[CX,CZ],[160,-90],[300,-250],[368,-374],[399,-380]],[[CX,CZ],[90,2
   [[CX,CZ],[-180,90],[-330,200],[-470,260]],[[-470,260],[-560,-60],[-560,-330],[-600,-520]],
   [[160,-90],[400,-10],[495,60],[560,60]]];   // the main road to the city's west arm (paved, see makeHighway)
 const ROADS=[];ROADP.forEach(pl=>{for(let i=0;i<pl.length-1;i++)ROADS.push([pl[i][0],pl[i][1],pl[i+1][0],pl[i+1][1]]);});
+// paved roads: the main road to the city and the city ring; the same curves shape the terrain under them, the asphalt mesh and the tyre marks
+const HWY_PTS=[[CX,CZ],[160,-90],[400,-10],[495,60],[560,60]];
+const CITY=SITES.find(t=>t.id==='city');
+const RING_PTS=(()=>{const R=73.6,rc=22,pts=[];for(const [cx,cz,a0] of [[R-rc,R-rc,0],[-(R-rc),R-rc,Math.PI/2],[-(R-rc),-(R-rc),Math.PI],[R-rc,-(R-rc),Math.PI*1.5]])
+  for(let i=0;i<=6;i++){const a=a0+i/6*Math.PI/2;pts.push([CITY.x+cx+Math.cos(a)*rc,CITY.z+cz+Math.sin(a)*rc]);}return pts;})();
+const PAVED=[];let PAVED_BB=[1e9,1e9,-1e9,-1e9];
+[[HWY_PTS,false],[RING_PTS,true]].forEach(([pts,closed])=>{const cv=new T.CatmullRomCurve3(pts.map(p=>new T.Vector3(p[0],0,p[1])),closed,'centripetal'),n=Math.ceil(cv.getLength()/5);
+  let prev=null;for(let i=0;i<=n;i++){const p=cv.getPointAt(i/n);if(prev)PAVED.push([prev.x,prev.z,p.x,p.z]);prev=p;
+    PAVED_BB=[Math.min(PAVED_BB[0],p.x),Math.min(PAVED_BB[1],p.z),Math.max(PAVED_BB[2],p.x),Math.max(PAVED_BB[3],p.z)];}});
+function pavedDist(x,z){if(x<PAVED_BB[0]-30||z<PAVED_BB[1]-30||x>PAVED_BB[2]+30||z>PAVED_BB[3]+30)return 1e9;
+  let best=1e18;for(const r of PAVED){if(Math.abs(x-r[0])>40&&Math.abs(x-r[2])>40)continue;const dx=r[2]-r[0],dz=r[3]-r[1];let t=((x-r[0])*dx+(z-r[1])*dz)/(dx*dx+dz*dz);t=t<0?0:t>1?1:t;
+    const ex=x-r[0]-dx*t,ez=z-r[1]-dz*t,d=ex*ex+ez*ez;if(d<best)best=d;}return Math.sqrt(best);}
+function onAsphalt(x,z){if(pavedDist(x,z)<6.7)return true;const lx=Math.abs(x-CITY.x),lz=Math.abs(z-CITY.z);return (lx<6.8&&lz<67)||(lz<6.8&&lx<67);}
 // the wadi: a dry valley from the north-west edge of the map down into a basin at the oasis
 const WADI=[[-1100,760],[-960,610],[-860,520],[-760,430],[-660,360],[-590,322],[-525,292]];
 const WSEG=[];let WLEN=0;for(let i=0;i<WADI.length-1;i++){const a=WADI[i],b=WADI[i+1],L=Math.hypot(b[0]-a[0],b[1]-a[1]);WSEG.push({a,b,L,s:WLEN});WLEN+=L;}
@@ -274,6 +287,7 @@ function Hraw(x,z){
   const b=base(x,z);
   const m=1-smoothstep(6,18,roadDist(x,z));
   let h=b+d0*(1-m)-0.15*m;
+  {const pd=pavedDist(x,z);if(pd<24){const k=smoothstep(9,24,pd);h=h*k+(b-0.15)*(1-k);}}   // a wide, smooth bed under the asphalt
   for(const t of SITES){const dd=Math.hypot(x-t.x,z-t.z);if(dd<t.r1){const k=smoothstep(t.r0,t.r1,dd);h=h*k+t.h*(1-k);}}
   for(const t of PANS){const dd=Math.hypot(x-t.x,z-t.z);if(dd<t.r1){const k=smoothstep(t.r0,t.r1,dd);h=h*k+t.h*(1-k);}}
   const wi=wadiInfo(x,z);if(wi.d<40){const bed=wadiBed(wi.t)+0.25*sm(Math.min(1,wi.d/9));const k=smoothstep(9,34,wi.d+2.5*noise(x*0.05,z*0.05));h=h*k+bed*(1-k);}
@@ -825,22 +839,18 @@ if(AAok){
      [[-0.6,-9.85,0],[0.6,-9.9,0.1],[1.5,-9.7,0.3],[-1.5,-9.55,-0.35]].forEach(([x,z,d],i)=>{const [px,pz]=lp(x,z+WD);put(K,'camel',px,pz,{over:[W1,W2,W3][i%3],rot:r+d,clip:'graze',r:1.1});});}
     put(hs,'shaib',-18,4,{over:{seed:623,bisht:'brown'},wander:20,herd:h,r:0.4});put(hs,'boy',16,-6,{over:{seed:624,headwear:'shemagh',agal:true},wander:20,herd:h,r:0.4});}
   // -- the city (Aboden-Assets kit «المدينة» scene): a four-lane crossroads with shops, flats, a petrol station, villas, a mosque and a tower
-  scene.add(makeHighway([[CX,CZ],[160,-90],[400,-10],[495,60],[560,60]],13.6));
-  {// ring road around the city: the four street arms (ending 66.8 m out) butt onto its inner edge
-   const C=SITES.find(t=>t.id==='city'),R=73.6,rc=22,pts=[];
-   for(const [cx,cz,a0] of [[R-rc,R-rc,0],[-(R-rc),R-rc,Math.PI/2],[-(R-rc),-(R-rc),Math.PI],[R-rc,-(R-rc),Math.PI*1.5]])
-     for(let i=0;i<=6;i++){const a=a0+i/6*Math.PI/2;pts.push([C.x+cx+Math.cos(a)*rc,C.z+cz+Math.sin(a)*rc]);}
-   scene.add(makeHighway(pts,13.6,true));}
+  scene.add(makeHighway(HWY_PTS,13.6));
+  scene.add(makeHighway(RING_PTS,13.6,true));   // ring road: the four street arms (ending 66.8 m out) butt onto its inner edge
   if(AA.assets.kit_intersection){const Cy=site('city');
-    const CITY=[
+    const CITYL=[
       ['kit_intersection',0,[[0,0,0,{seed:1,lanes:'4',sidewalk:3}]]],
       ['kit_road',1,[16.8,36.8,56.8].flatMap(d=>[[0,-d,0],[0,d,0],[d,0,Math.PI/2],[-d,0,Math.PI/2]]).map((r,i)=>i?r:[r[0],r[1],r[2],{seed:2,lanes:'4',sidewalk:3,length:20}])],   // arms butt onto the 13.6 m crossroads (no gaps)
-      ['kit_apartment',0,[[-31,-17.5,0,{seed:3,floors:6}]]],
       ['kit_shop',0,[[-19.5,-13.4,0,{seed:4}],[-13,-13.4,0,{seed:5,kind:'cafe',color:'white'}]]],
       
-      ['kit_villa',0,[[-20,21.5,Math.PI,{seed:7}],[-40,21.5,Math.PI,{seed:8,color:'white',accent:'wood',floors:1,width:11}]]],
+      ['kit_villa',0,[[-20,21.5,Math.PI,{seed:7,floors:1,width:11}],[-40,21.5,Math.PI,{seed:8,color:'white',accent:'wood',floors:1,width:11}],[-58,21.5,Math.PI,{seed:50,floors:1,width:10,depth:9}],
+        // small one-storey houses in the north-west block (replacing the flats and the office tower)
+        ...[[-31,-23],[-45,-23],[-59,-23],[-31,-41],[-45,-41],[-59,-41],[-31,-58],[-45,-58]].map(([x,z],i)=>[x,z,0,{seed:51+i,floors:1,width:10,depth:9,color:['plaster','white','plaster','sandstone'][i%4]}])]],
       ['kit_mosque_modern',0,[[22,23,Math.PI,{seed:9}]]],
-      ['kit_office_tower',0,[[-30,-48,0,{seed:10,floors:20}]]],
       ['kit_street_lamp',1,[[8.3,-14,-Math.PI/2,{seed:11,height:8}],[-8.3,-24,Math.PI/2],[8.3,-34,-Math.PI/2],[-8.3,14,Math.PI/2],[8.3,24,-Math.PI/2],[-8.3,34,Math.PI/2],[14,8.3,Math.PI],[24,-8.3,0],[-14,-8.3,0],[-24,8.3,Math.PI],[34,8.3,Math.PI],[-34,-8.3,0]]],
       ['kit_traffic_light',1,[[7.6,-7.6,Math.PI,{seed:12}],[-7.6,7.6,0],[7.6,7.6,Math.PI/2],[-7.6,-7.6,-Math.PI/2]]],
       ['kit_sign',0,[[9,-18,Math.PI,{seed:13,type:'speed',speed:'60'}],[-9,18,0,{seed:14,type:'speed',speed:'60'}],[-18,-8.5,Math.PI/2,{seed:15,type:'parking'}],[18,9,-Math.PI/2,{seed:16,type:'warning'}],[9,-44,Math.PI,{seed:17,type:'direction'}]]],
@@ -851,7 +861,7 @@ if(AAok){
       ['kit_sedan',0,[[-5.1,30,Math.PI,{seed:26,color:'blue'}],[5.1,-30,0,{seed:27,livery:'police',color:'white'}],[-5.1,-42,Math.PI,{seed:24,color:'red'}],[5.1,44,0,{seed:25,livery:'taxi',color:'white'}],[30,-5.1,-Math.PI/2,{seed:40,color:'grey'}]]],
       ['kit_suv',0,[[-25,13.65,0,{seed:29}],[-44,5.1,Math.PI/2,{seed:28,color:'white'}]]],['kit_pickup',0,[[44,5.1,-Math.PI/2,{seed:30,color:'grey',load:'boxes'}]]],
       ['kit_bus',0,[[-30,5.1,-Math.PI/2,{seed:31}]]]];
-    for(const [id,shared,list] of CITY){let first={};list.forEach((it,i)=>{const ov=it[3]||(shared?first:{});if(i===0)first=ov;
+    for(const [id,shared,list] of CITYL){let first={};list.forEach((it,i)=>{const ov=it[3]||(shared?first:{});if(i===0)first=ov;
       const flat=/intersection|road|sign|bench|trash|hydrant|bollard/.test(id);put(Cy,id,it[0],it[1],{rot:it[2],over:ov,nocol:/intersection|road/.test(id)});});}
     // petrol station: drive-through — no box over the whole lot, only the shop, the pump islands and the price sign block the car
     {const gx=23,gz=-25.4,r=-Math.PI/2,c=Math.cos(r),sn=Math.sin(r);put(Cy,'kit_gas_station',gx,gz,{rot:r,over:{seed:6,pumps:2},nocol:true});
@@ -1595,6 +1605,15 @@ function stepDyn(dt){
 
 /* ---------------- effects driven by the car ---------------- */
 const _wp=new T.Vector3();
+// tyre marks on asphalt: dark rubber strips laid while the tyres slide (a ring buffer of quads)
+const SKID_N=1400,skPos=new Float32Array(SKID_N*12),skCol=new Float32Array(SKID_N*16);let skI=0;
+const skGeo=new T.BufferGeometry();skGeo.setAttribute('position',new T.BufferAttribute(skPos,3));skGeo.setAttribute('color',new T.BufferAttribute(skCol,4));
+{const id=new Uint32Array(SKID_N*6);for(let i=0;i<SKID_N;i++){const a=i*4;id.set([a,a+2,a+1,a+1,a+2,a+3],i*6);}skGeo.setIndex(new T.BufferAttribute(id,1));}
+const skMesh=new T.Mesh(skGeo,new T.MeshBasicMaterial({color:0x111111,vertexColors:true,transparent:true,depthWrite:false,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}));
+skMesh.frustumCulled=false;skMesh.renderOrder=2;scene.add(skMesh);
+function addSkid(x0,z0,x1,z1,w,a){const dx=x1-x0,dz=z1-z0,L=Math.hypot(dx,dz)||1,nx=-dz/L*w/2,nz=dx/L*w/2,o=skI*12,c=skI*16;
+  const y0=H(x0,z0)+0.11,y1=H(x1,z1)+0.11;skPos.set([x0-nx,y0,z0-nz,x0+nx,y0,z0+nz,x1-nx,y1,z1-nz,x1+nx,y1,z1+nz],o);
+  for(let k=0;k<4;k++)skCol.set([1,1,1,a],c+k*4);skI=(skI+1)%SKID_N;skGeo.attributes.position.needsUpdate=true;skGeo.attributes.color.needsUpdate=true;}
 function carEffects(dt){
   sMat.uniforms.uWetS.value=S.wet?1:0;
   if(S.wet&&S.spd>2){const wy=waterY(S.x,S.z);for(let k=0;k<Math.min(6,S.spd*0.4);k++){const a=Math.random()*6.283;
@@ -1603,13 +1622,16 @@ function carEffects(dt){
   const fx=Math.sin(S.h),fz=Math.cos(S.h),rx=Math.cos(S.h),rz=-Math.sin(S.h);
   wheels.forEach((w,i)=>{
     const x=S.x+rx*w.x+fx*w.z, z=S.z+rz*w.x+fz*w.z;
+    const asph=onAsphalt(x,z);
     if(!S.air&&w.has){const d=Math.hypot(x-w.px,z-w.pz);
-      if(d>0.25){const str=0.11+Math.min(0.24,slip*0.025);stamp(w.px,w.pz,x,z,0.55,str);
-        if(!w.front&&slip>4)stamp(w.px,w.pz,x,z,2.0,Math.min(0.16,slip*0.012));
+      if(d>0.25){
+        if(asph){const need=w.front?6:2.6;if(slip>need&&d<3)addSkid(w.px,w.pz,x,z,0.3,Math.min(0.75,0.25+(slip-need)*0.06));}   // rubber, not ruts
+        else{const str=0.11+Math.min(0.24,slip*0.025);stamp(w.px,w.pz,x,z,0.55,str);
+          if(!w.front&&slip>4)stamp(w.px,w.pz,x,z,2.0,Math.min(0.16,slip*0.012));}
         w.px=x;w.pz=z;}}
     else{w.px=x;w.pz=z;w.has=true;}
     if(S.air)w.has=false;
-    if(!S.air&&!w.front&&!S.wet){
+    if(!S.air&&!w.front&&!S.wet&&!asph){
       const y=H(x,z);
       const inten=Math.min(1.6,slip*0.11+sp*0.02);
       let n=inten*2.8*(dt*60);while(n>0){if(Math.random()<n){
