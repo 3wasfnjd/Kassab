@@ -70,6 +70,10 @@ body.photo .hud,body.photo #map,body.photo .pads,body.photo #steer,body.photo #w
 #phTime{position:fixed;top:calc(54px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:#e23b2e;padding:3px 10px;border-radius:10px;font-variant-numeric:tabular-nums;display:none}
 #phMsg{position:fixed;top:calc(54px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:rgba(30,22,14,.55);padding:4px 12px;border-radius:12px;display:none;white-space:nowrap}
 #phFlash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+#phView{position:fixed;inset:0;z-index:40;background:rgba(12,9,6,.86);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;direction:rtl;color:#fff;font:700 14px var(--font);pointer-events:auto}
+#phView.on{display:flex}#phView img,#phView video{max-width:92vw;max-height:62vh;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.5);-webkit-touch-callout:default;user-select:auto}
+#phView p{margin:0;opacity:.85;font-size:13px;text-align:center}#phView .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#phView button{height:42px;padding:0 18px;border-radius:21px;border:1.5px solid rgba(255,255,255,.6);background:rgba(255,255,255,.12);color:#fff;font:700 14px var(--font)}#phView button.main{background:#fff;color:#2a1d10;border-color:#fff}
 #wxPanel h6{margin:2px 4px 6px;font:800 12px var(--font);opacity:.75}
 #wxPanel .row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
 #wxPanel button{height:44px;border-radius:11px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:700 12px var(--font);
@@ -168,6 +172,8 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
   <div id="phShots"><button id="phRec" aria-label="تسجيل فيديو"><i></i></button><button id="phShot" aria-label="صورة"></button></div>
   <div id="phTime">٠:٠٠</div><div id="phMsg"></div><div id="phFlash"></div>
 </div>
+<div id="phView" role="dialog" aria-label="معاينة"><div id="phMedia"></div><p id="phHint"></p>
+  <div class="row"><button id="phSave" class="main">حفظ</button><button id="phShare">مشاركة</button><button id="phClose">إغلاق</button></div></div>
 <div id="wxPanel" hidden>
   <h6>الطقس</h6>
   <div class="row" id="wxRow">
@@ -1987,8 +1993,17 @@ audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
   // saving: through the claude.ai download prompt when the page runs there, otherwise a normal browser download
   let dl=null;try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(d=>{dl=d;}).catch(()=>{});}catch(e){}
   const stamp=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());};
-  async function saveBlob(blob,name){if(dl){try{await dl.save({filename:name,data:blob});msg('تم الحفظ ✓');}catch(e){msg(e&&e.code==='declined'?'ما انحفظ':'ما قدرت أحفظ الملف',2.5);}return;}
-    const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),30000);msg('تم الحفظ ✓');}
+  // every photo/clip opens a preview: long-press it to keep it in the gallery, or save it as a file / share it
+  const view=$('phView'),media=$('phMedia');let cur=null;
+  function showShot(blob,name){if(cur&&cur.url)URL.revokeObjectURL(cur.url);const url=URL.createObjectURL(blob),isV=/^video/.test(blob.type);cur={blob,name,url};
+    media.innerHTML='';const el=document.createElement(isV?'video':'img');el.src=url;if(isV){el.controls=true;el.playsInline=true;el.loop=true;}media.appendChild(el);
+    $('phHint').textContent=isV?'«حفظ» ينزّل المقطع في مجلد التنزيلات (Downloads) — أو «مشاركة» وتختار حفظ الفيديو أو ترسله':'اضغط مطوّلاً على الصورة واختر «حفظ الصورة» لتنحفظ في الألبوم — أو «حفظ» تنزل في مجلد التنزيلات (Downloads)';
+    const f=new File([blob],name,{type:blob.type});$('phShare').style.display=(navigator.canShare&&navigator.canShare({files:[f]}))?'':'none';view.classList.add('on');}
+  $('phClose').addEventListener('click',()=>view.classList.remove('on'));
+  $('phShare').addEventListener('click',async()=>{if(!cur)return;try{await navigator.share({files:[new File([cur.blob],cur.name,{type:cur.blob.type})],title:'تطعيس كساب'});}catch(e){if(e&&e.name!=='AbortError')msg('المشاركة ما اشتغلت هنا — استخدم «حفظ»',3);}});
+  $('phSave').addEventListener('click',()=>{if(cur)saveBlob(cur.blob,cur.name);});
+  async function saveBlob(blob,name){if(dl){try{await dl.save({filename:name,data:blob});msg('انحفظ ✓ — تلقاه في مجلد التنزيلات (Downloads)',3.5);}catch(e){msg(e&&e.code==='declined'?'ما انحفظ':'ما قدرت أحفظ الملف هنا',2.5);}return;}
+    const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);msg('بدأ التنزيل — تلقاه في مجلد التنزيلات (Downloads)',3.5);}
   const logo=document.querySelector('.brand');
   $('phShot').addEventListener('click',()=>{if(PH.land>0)return;   // render once at a higher pixel ratio, stamp the logo, save a jpg
     const pr=renderer.getPixelRatio(),hi=Math.min(2.5,Math.max(pr,devicePixelRatio||1));renderer.setPixelRatio(hi);renderer.render(scene,camera);
@@ -1996,7 +2011,7 @@ audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
     renderer.setPixelRatio(pr);resize();
     if(logo&&logo.complete&&logo.naturalWidth){const w=c.width*0.09,h=w*logo.naturalHeight/logo.naturalWidth;x.globalAlpha=0.85;x.drawImage(logo,c.width-w-c.width*0.025,c.height-h-c.width*0.025,w,h);}
     const f=$('phFlash');f.style.opacity=0.85;setTimeout(()=>f.style.opacity=0,90);
-    c.toBlob(b=>{if(b)saveBlob(b,'kassab-'+stamp()+'.jpg');},'image/jpeg',0.93);});
+    c.toBlob(b=>{if(b)showShot(b,'kassab-'+stamp()+'.jpg');},'image/jpeg',0.93);});
   // video: the 3D view plus the car and the radio, up to 60 s
   let recT0=0,recTimer=null;
   window.stopRec=function(){if(!PH.rec)return;try{PH.rec.stop();}catch(e){}};
@@ -2010,7 +2025,7 @@ audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
     let rec;try{rec=new MediaRecorder(new MediaStream(tracks),mt?{mimeType:mt,videoBitsPerSecond:8e6}:{});}catch(e){msg('ما قدرت أبدأ التسجيل',2.5);return;}
     const parts=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)parts.push(e.data);};
     rec.onstop=()=>{clearInterval(recTimer);$('phTime').style.display='none';$('phRec').classList.remove('on');PH.rec=null;
-      const type=rec.mimeType||mt||'video/webm',ext=/mp4/.test(type)?'mp4':'webm';if(parts.length)saveBlob(new Blob(parts,{type}),'kassab-'+stamp()+'.'+ext);};
+      const type=rec.mimeType||mt||'video/webm',ext=/mp4/.test(type)?'mp4':'webm';if(parts.length)showShot(new Blob(parts,{type}),'kassab-'+stamp()+'.'+ext);};
     rec.start(500);PH.rec=rec;recT0=performance.now();$('phRec').classList.add('on');$('phTime').style.display='block';
     recTimer=setInterval(()=>{const s=(performance.now()-recT0)/1000|0;$('phTime').textContent=AR(Math.floor(s/60))+':'+AR(String(s%60).padStart(2,'0'));if(s>=60)stopRec();},250);});}
 // weather panel: a small icon opens it; weather and time of day can be pinned or left automatic
