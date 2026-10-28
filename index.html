@@ -2289,8 +2289,10 @@ function stepCritters(dt){if(!CRIT.ready)return;const carSp=Math.hypot(S.vx,S.vz
     let mv=0;
     if(d.st==='bask'){d.g.children[1].position.y=0.07+Math.max(0,Math.sin(d.t*3+d.ph))*0.015;if(d.t>5+Math.random()*4){d.st='walk';d.t=0;const a=Math.random()*6.28,rr=1+Math.random()*4;d.tx=d.hx+Math.cos(a)*rr;d.tz=d.hz+Math.sin(a)*rr;}}
     else if(d.st==='walk'||d.st==='flee'){const tx=d.st==='flee'?d.hx:d.tx,tz=d.st==='flee'?d.hz:d.tz,dx=tx-d.x,dz=tz-d.z,l=Math.hypot(dx,dz);
-      const sp=d.st==='flee'?3.2:0.5;if(l<0.12){if(d.st==='flee'){d.st='hidden';d.hide=7+Math.random()*8;}else{d.st='bask';d.t=0;}}
-      else{d.h+=Math.atan2(Math.sin(Math.atan2(dx,dz)-d.h),Math.cos(Math.atan2(dx,dz)-d.h))*Math.min(1,dt*8);const st=Math.min(l,sp*dt);d.x+=Math.sin(d.h)*st;d.z+=Math.cos(d.h)*st;mv=sp;}}
+      const sp=d.st==='flee'?3.2:0.5;
+      if(l<=sp*dt+0.15){d.x=tx;d.z=tz;if(d.st==='flee'){d.st='hidden';d.hide=7+Math.random()*8;}else{d.st='bask';d.t=0;}}   // arrive (no circling round the burrow)
+      else{const want=Math.atan2(dx,dz),dh=Math.atan2(Math.sin(want-d.h),Math.cos(want-d.h));d.h+=dh*(l<2.5?1:Math.min(1,dt*8));
+        const st=Math.min(l,sp*dt)*Math.max(0,Math.cos(dh));d.x+=Math.sin(d.h)*st;d.z+=Math.cos(d.h)*st;mv=sp;}}
     else if(d.st==='hidden'){d.hide-=dt;if(d.hide<=0&&dc>18){d.st='bask';d.t=0;d.x=d.hx;d.z=d.hz;}}
     const w=Math.sin(d.t*(mv>1?26:10));d.legs.forEach((l,i)=>l.rotation.y=mv?w*0.7*(i%2?1:-1)*(i<2?1:-1):0);
     d.tail.forEach((j,i)=>j.rotation.y=Math.sin(d.t*(mv>1?18:3)-i*0.9)*(mv>1?0.35:0.08));
