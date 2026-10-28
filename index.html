@@ -52,7 +52,7 @@ body.title .brand{width:84px}
 #wxBtn{position:fixed;top:calc(168px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
 #wxBtn.on{border-color:var(--accent);color:var(--accent);background:var(--glass-hi)}
-#wxPanel{position:fixed;top:calc(168px + env(safe-area-inset-top,0px));right:calc(62px + env(safe-area-inset-right,0px));width:min(250px,60vw);padding:10px 10px 8px;
+#wxPanel{position:fixed;z-index:30;top:calc(8px + env(safe-area-inset-top,0px));right:calc(62px + env(safe-area-inset-right,0px));width:min(430px,calc(100vw - 150px));max-height:calc(100vh - 16px);overflow-y:auto;padding:8px 10px 4px;
   border-radius:16px;border:1.5px solid var(--rim);background:rgba(58,40,22,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff;direction:rtl;font:700 12px var(--font)}
 #wxPanel[hidden]{display:none}
 #camBtn{position:fixed;top:calc(214px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
@@ -81,8 +81,10 @@ body.photo .hud,body.photo #map,body.photo .pads,body.photo #steer,body.photo #w
 #phView p{margin:0;opacity:.85;font-size:13px;text-align:center}#phView .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 #phView button{height:42px;padding:0 18px;border-radius:21px;border:1.5px solid rgba(255,255,255,.6);background:rgba(255,255,255,.12);color:#fff;font:700 14px var(--font)}#phView button.main{background:#fff;color:#2a1d10;border-color:#fff}
 #wxPanel h6{margin:2px 4px 6px;font:800 12px var(--font);opacity:.75}
-#wxPanel .row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
-#wxPanel button{height:44px;border-radius:11px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:700 12px var(--font);
+#wxPanel .row{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:6px}
+#wxPanel #seasonRow{grid-template-columns:repeat(3,1fr)}
+body.wxopen .pads,body.wxopen #steer,body.wxopen #awd{visibility:hidden}
+#wxPanel button{height:40px;border-radius:11px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:700 12px var(--font);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
 #wxPanel button i{font-style:normal;font-size:16px;line-height:1}
 #wxPanel button.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
@@ -2062,7 +2064,7 @@ audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
     recTimer=setInterval(()=>{const s=(performance.now()-recT0)/1000|0;$('phTime').textContent=AR(Math.floor(s/60))+':'+AR(String(s%60).padStart(2,'0'));if(s>=60)stopRec();},250);});}
 // weather panel: a small icon opens it; weather and time of day can be pinned or left automatic
 {const btn=document.getElementById('wxBtn'),pan=document.getElementById('wxPanel'),wxRow=document.getElementById('wxRow'),dayRow=document.getElementById('dayRow');
-  const open=v=>{pan.hidden=!v;btn.classList.toggle('on',v);};
+  const open=v=>{pan.hidden=!v;btn.classList.toggle('on',v);document.body.classList.toggle('wxopen',v);};
   btn.addEventListener('click',e=>{e.stopPropagation();open(pan.hidden);});
   pan.addEventListener('pointerdown',e=>e.stopPropagation());
   document.addEventListener('pointerdown',e=>{if(!pan.hidden&&e.target!==btn&&!btn.contains(e.target))open(false);});
