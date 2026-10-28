@@ -55,6 +55,10 @@ body.title .brand{width:84px}
 #wxPanel{position:fixed;z-index:30;top:calc(8px + env(safe-area-inset-top,0px));right:calc(62px + env(safe-area-inset-right,0px));width:min(430px,calc(100vw - 150px));max-height:calc(100vh - 16px);overflow-y:auto;padding:8px 10px 4px;
   border-radius:16px;border:1.5px solid var(--rim);background:rgba(58,40,22,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff;direction:rtl;font:700 12px var(--font)}
 #wxPanel[hidden]{display:none}
+/* landscape: the on-screen interface fades away after a few seconds without a new touch (controls keep working); any touch brings it back */
+.hud,#map,#reset,#radio,#wxBtn,#camBtn,#awd,.pads,#knobBase,#wx,.brand{transition:opacity .5s}
+body.uihide .hud,body.uihide #map,body.uihide #reset,body.uihide #radio,body.uihide #wxBtn,body.uihide #camBtn,body.uihide #wx,body.uihide .brand{opacity:0}
+body.uihide .pads,body.uihide #knobBase,body.uihide #awd{opacity:.14}   /* driving controls stay faintly visible and keep working */
 #camBtn{position:fixed;top:calc(214px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
 #photoUI{position:fixed;inset:0;display:none;pointer-events:none;z-index:20;font:700 13px var(--font);color:#fff}
@@ -1999,6 +2003,10 @@ function tune(k){station=k;radioEl.classList.toggle('on',k>0);
   if(pr&&pr.catch)pr.catch(()=>{});}
 radioEl.addEventListener('click',()=>tune(station?0:lastSong%RADIO.length+1));
 audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
+// auto-hide the interface in landscape
+{let uiT=3;document.addEventListener('pointerdown',()=>{uiT=3.5;document.body.classList.remove('uihide');},{capture:true});
+  setInterval(()=>{const on=innerWidth>innerHeight&&game.mode==='play'&&!PH.on&&!document.body.classList.contains('wxopen');
+    if(!on){uiT=3.5;document.body.classList.remove('uihide');return;}uiT-=0.25;document.body.classList.toggle('uihide',uiT<=0);},250);}
 // photo mode controls, photos and video clips
 {const $=id=>document.getElementById(id),msg=(t,sec)=>{const m=$('phMsg');m.textContent=t;m.style.display='block';clearTimeout(msg.t);msg.t=setTimeout(()=>m.style.display='none',(sec||2)*1000);};
   $('camBtn').addEventListener('click',enterPhoto);
