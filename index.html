@@ -62,6 +62,9 @@ body.uihide .pads,body.uihide #knobBase,body.uihide #awd,body.uihide #ftStick,bo
 #camBtn{position:fixed;top:calc(214px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
 /* online */
+#carPick{display:flex;gap:8px;justify-content:center;margin:0 auto 14px}#carPick[hidden]{display:none}
+#carPick button{font:800 15px var(--font);padding:6px 16px;border-radius:12px;border:1.5px solid rgba(60,36,14,.35);background:rgba(255,248,232,.7);color:#2a2118}
+#carPick button.on{background:#2a2118;color:#f2c27a;border-color:#2a2118}
 #nick{display:block;margin:0 auto 12px;width:min(240px,70vw);font:700 16px var(--font);text-align:center;padding:8px 12px;border-radius:12px;border:1.5px solid rgba(60,36,14,.35);background:rgba(255,248,232,.85);color:#2a2118}
 #netn{font-weight:800}
 #chatBtn{position:fixed;top:calc(76px + env(safe-area-inset-top,0px));right:calc(246px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
@@ -276,6 +279,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
   <h1>كسّاب</h1>
   <p>اهداء لصديقي ابوحصه 💕</p>
   <input id="nick" maxlength="16" placeholder="اسمك في الأونلاين" dir="auto" autocomplete="off" hidden>
+  <div id="carPick" hidden><button data-car="gmc">جمس</button><button data-car="haval">هافال</button></div>
   <button id="start" hidden>ابدأ</button>
 </div>
 
@@ -2358,15 +2362,15 @@ async function loadCarSplit(name){
   return{g,tex};}
 const loadEl=document.getElementById('load'),loadBar=document.getElementById('loadbar'),loadTx=document.getElementById('loadtx'),startEl=document.getElementById('start');
 // the Start button appears only once the model is actually on screen: wait for it to be drawn, then fade the button in
-function carLoadDone(){loadEl.hidden=true;const show=()=>{startEl.hidden=false;startEl.classList.add('show');document.getElementById('nick').hidden=false;};
+function carLoadDone(){loadEl.hidden=true;const show=()=>{startEl.hidden=false;startEl.classList.add('show');document.getElementById('nick').hidden=false;const cp=document.getElementById('carPick');cp.hidden=false;cp.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.car===CARSEL));};
   if(window.__noLoop){show();return;}requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(show,500)));}
 setInterval(()=>{if(loadEl.hidden)return;const k=carLoad.total?Math.min(0.99,carLoad.got/carLoad.total):0;loadBar.style.width=(k*100).toFixed(1)+'%';
   loadEl.setAttribute('aria-valuenow',Math.round(k*100));loadTx.textContent=Math.round(k*100).toLocaleString('ar-SA')+'٪';},150);
 function showProcCar(v){body.children.forEach(o=>{if(o.isMesh&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=v;});wheels.forEach(w=>w.w.visible=v);}
 showProcCar(false);
-function carMesh({g,tex}){g.computeBoundingBox();const bb=g.boundingBox,k=CAR_LEN/(bb.max.z-bb.min.z);
+function carMesh({g,tex},len){len=len||CAR_LEN;g.computeBoundingBox();const bb=g.boundingBox,k=len/(bb.max.z-bb.min.z);
   const m=new T.Mesh(g,new T.MeshStandardMaterial({map:tex,roughness:0.55,metalness:0.15}));
-  m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.userData.sh=true;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;return m;}
+  m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.userData.sh=true;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;m.userData.len=len;return m;}
 // Saudi plate (2006 design, 335x155 mm): Arabic digits/letters on top, Latin below, digits left, letters right,
 // side strip with the emblem, السعودية, K S A and the category mark — blue strip with a down-pointing triangle
 function saudiPlate(){
@@ -2399,32 +2403,40 @@ function fitPlates(m){
   if(!plates){const tex=saudiPlate(),mat=new T.MeshStandardMaterial({map:tex,roughness:0.45,metalness:0.05,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:0.32}); // faint self-light keeps it readable in the bumper's shade
     plates=[0,1].map(i=>{const pl=new T.Mesh(new T.PlaneGeometry(0.335,0.155),mat);pl.renderOrder=1;pl.userData.keep=true;body.add(pl);return pl;});
     plates[1].rotation.y=Math.PI;plates.forEach(pl=>pl.scale.setScalar(1.55));} // the model is scaled a bit larger than life, so the plate follows
-  plates[0].position.set(0,H2*PLATE.fy,CAR_LEN/2+PLATE.fz);   // front bumper
-  plates[1].position.set(0,H2*PLATE.ry,-CAR_LEN/2-PLATE.rz);  // tailgate / rear bumper
+  plates[0].position.set(0,H2*PLATE.fy,(m.userData.len||CAR_LEN)/2+PLATE.fz);   // front bumper
+  plates[1].position.set(0,H2*PLATE.ry,-(m.userData.len||CAR_LEN)/2-PLATE.rz);  // tailgate / rear bumper
 }
 const PLATE={fy:0.255,fz:0.02,ry:0.33,rz:0.02};
 // two versions: the original model as sent (511k triangles, 2048 texture) for the title page only, the light one (25k) for driving
-const carModels={light:null,hq:null};
+const carModels={light:null,hq:null,gmc:null,haval:null};
 function useCar(m){
-  if(!m)return;[carModels.light,carModels.hq].forEach(o=>{if(o&&o!==m)o.visible=false;});m.visible=true;if(!m.parent)body.add(m);
-  body.children.forEach(o=>{if(o.isMesh&&!o.userData.keep&&o!==carModels.light&&o!==carModels.hq&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=false;});
+  if(!m)return;[carModels.light,carModels.hq,carModels.gmc,carModels.haval].forEach(o=>{if(o&&o!==m)o.visible=false;});m.visible=true;if(!m.parent)body.add(m);
+  body.children.forEach(o=>{if(o.isMesh&&!o.userData.keep&&o!==carModels.light&&o!==carModels.hq&&o!==carModels.gmc&&o!==carModels.haval&&o!==carLamps.tailPool&&o!==carLamps.headPool)o.visible=false;});
   wheels.forEach(w=>w.w.visible=false);           // the model carries its own wheels
   const bb=m.userData.bb,k=m.userData.k,H2=(bb.max.y-bb.min.y)*k,W2=(bb.max.x-bb.min.x)*k;
-  carLamps.tails.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.4,H2*0.58,-CAR_LEN/2-0.04));
-  carLamps.rev.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.3,H2*0.58,-CAR_LEN/2-0.04));
-  carLamps.heads.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.36,H2*0.53,CAR_LEN/2+0.05));
-  carLamps.tailPool.position.z=-CAR_LEN/2-1.6;
-  heads.forEach((l,i)=>l.position.set((i?1:-1)*W2*0.32,H2*0.52,CAR_LEN/2-0.1));
+  carLamps.tails.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.4,H2*0.58,-(m.userData.len||CAR_LEN)/2-0.04));
+  carLamps.rev.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.3,H2*0.58,-(m.userData.len||CAR_LEN)/2-0.04));
+  carLamps.heads.forEach((sp,i)=>sp.position.set((i?1:-1)*W2*0.36,H2*0.53,(m.userData.len||CAR_LEN)/2+0.05));
+  carLamps.tailPool.position.z=-(m.userData.len||CAR_LEN)/2-1.6;
+  heads.forEach((l,i)=>l.position.set((i?1:-1)*W2*0.32,H2*0.52,(m.userData.len||CAR_LEN)/2-0.1));
   fitPlates(m);window.__carModel=m;}
 // when the drive starts, swap the detailed car for the light one and free the detailed one
 function dropHQ(){const m=carModels.hq;if(!m)return;carModels.hq=null;if(carModels.light)useCar(carModels.light);
   body.remove(m);m.geometry.dispose();if(m.material.map)m.material.map.dispose();m.material.dispose();}
 // title page shows only the original model; the light one waits hidden until driving starts (or the original fails to load)
 let origFailed=false;
-loadCar('car').then(d=>{carModels.light=carMesh(d);if(game.mode==='play'||origFailed)useCar(carModels.light);else{carModels.light.visible=false;body.add(carModels.light);}})
+/* car choice: the GMC or the owner's Haval H9 (models/haval.glb, 49k triangles) */
+let CARSEL=lsGet('kassab_car')==='haval'?'haval':'gmc';
+let havalP=null;
+function loadHaval(){if(!havalP)havalP=loadGLB('models/haval.glb').then(d=>{const m=carMesh(d,4.86);m.material.roughness=0.45;m.visible=false;carModels.haval=m;return m;});return havalP;}
+function pickCar(id){CARSEL=id;lsSet('kassab_car',id);document.querySelectorAll('#carPick button').forEach(b=>b.classList.toggle('on',b.dataset.car===id));
+  if(id==='haval')loadHaval().then(m=>{if(CARSEL!=='haval')return;carModels.light=m;if(carModels.hq&&game.mode!=='play'){carModels.hq.visible=false;}useCar(m);}).catch(e=>{console.warn('haval',e);showToast('ما تحمّلت الهافال',2);pickCar('gmc');});
+  else if(carModels.gmc){carModels.light=carModels.gmc;useCar(carModels.hq&&game.mode!=='play'?carModels.hq:carModels.gmc);}}
+document.querySelectorAll('#carPick button').forEach(b=>b.addEventListener('click',()=>pickCar(b.dataset.car)));
+loadCar('car').then(d=>{carModels.light=carModels.gmc=carMesh(d);if(CARSEL==='haval'){carModels.gmc.visible=false;body.add(carModels.gmc);pickCar('haval');return;}if(game.mode==='play'||origFailed)useCar(carModels.light);else{carModels.light.visible=false;body.add(carModels.light);}})
   .catch(e=>{console.warn('car model',e);if(!carModels.hq)showProcCar(true);});
 carLoad.total=17313216;   // original .glb (repo); the published page uses the split files below
-loadGLB('models/car_orig.glb',true).catch(()=>{carLoad.got=0;carLoad.total=22738956;return loadCarSplit('car_orig');}).then(d=>{carLoadDone();if(game.mode==='play'){d.g.dispose();return;}carModels.hq=carMesh(d);carModels.hq.material.map.anisotropy=8;useCar(carModels.hq);})
+loadGLB('models/car_orig.glb',true).catch(()=>{carLoad.got=0;carLoad.total=22738956;return loadCarSplit('car_orig');}).then(d=>{carLoadDone();if(game.mode==='play'){d.g.dispose();return;}carModels.hq=carMesh(d);carModels.hq.material.map.anisotropy=8;if(CARSEL==='haval'){carModels.hq.visible=false;body.add(carModels.hq);}else useCar(carModels.hq);})
   .catch(e=>{console.warn('original car',e);origFailed=true;carLoadDone();if(carModels.light&&game.mode!=='play')useCar(carModels.light);});
 
 /* ---------------- loop ---------------- */
@@ -2635,7 +2647,7 @@ function netStart(){if(NET.url||NET.ws)return;
   fetch('online.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>go(j&&j.ws)).catch(()=>{});}
 function netConnect(){
   let opened=false,ws;try{ws=new WebSocket(NET.url+'?w='+NET.shard);}catch(e){return;}
-  ws.onopen=()=>{opened=true;NET.ws=ws;NET.retry=0;ws.send(JSON.stringify({t:'hi',name:NET.name,car:'gmc'}));};
+  ws.onopen=()=>{opened=true;NET.ws=ws;NET.retry=0;ws.send(JSON.stringify({t:'hi',name:NET.name,car:CARSEL}));};
   ws.onmessage=e=>{if(e.data==='pong')return;let m;try{m=JSON.parse(e.data);}catch(er){return;}netMsg(m);};
   ws.onclose=()=>{if(NET.ws===ws)NET.ws=null;netClearPeers();document.body.classList.remove('online');netBadge();
     if(!opened&&NET.shard<12){NET.shard++;setTimeout(netConnect,300);return;}   // shard full or unreachable: try the next one
@@ -2644,8 +2656,8 @@ function netConnect(){
 function netSend(o){if(NET.ws&&NET.ws.readyState===1)NET.ws.send(typeof o==='string'?o:JSON.stringify(o));}
 function netBadge(){const el=document.getElementById('netn');if(!el)return;el.textContent=NET.ws&&NET.id?' · أونلاين '+AR_N(NET.peers.size+1):'';}
 function netMsg(m){
-  if(m.t==='welcome'){NET.id=m.i;document.body.classList.add('online');(m.players||[]).forEach(p=>{const pr=netPeer(p.i,p.n);if(p.d)netPush(pr,p.d);});netBadge();showToast('دخلت الأونلاين — '+AR_N(NET.peers.size+1)+' بالعالم',2.2);}
-  else if(m.t==='join'){netPeer(m.i,m.n);netBadge();chatLine(null,m.n+' دخل العالم');}
+  if(m.t==='welcome'){NET.id=m.i;document.body.classList.add('online');(m.players||[]).forEach(p=>{const pr=netPeer(p.i,p.n);pr.carId=p.c;if(p.d)netPush(pr,p.d);});netBadge();showToast('دخلت الأونلاين — '+AR_N(NET.peers.size+1)+' بالعالم',2.2);}
+  else if(m.t==='join'){netPeer(m.i,m.n).carId=m.c;netBadge();chatLine(null,m.n+' دخل العالم');}
   else if(m.t==='leave'){const p=NET.peers.get(m.i);if(p){netDrop(p);NET.peers.delete(m.i);netBadge();chatLine(null,p.name+' طلع');}}
   else if(m.t==='s'){const p=NET.peers.get(m.i)||netPeer(m.i,'…');netPush(p,m.d);}
   else if(m.t==='horn'){const p=NET.peers.get(m.i);if(p&&p.cur){const d=Math.hypot(p.cur[0]-FOC.x,p.cur[1]-FOC.z);if(d<160)hornSound(Math.max(0.05,1-d/160));}}
@@ -2666,7 +2678,7 @@ function peerBubble(p,text){if(p.bub){scene.remove(p.bub);p.bub.material.map.dis
 function netDrop(p){[p.car,p.tag,p.bub,p.man].forEach(o=>{if(o&&o.parent)o.parent.remove(o);});}
 function netClearPeers(){NET.peers.forEach(netDrop);NET.peers.clear();NET.id=null;}
 function netPush(p,d){p.buf.push({t:performance.now()/1000,d});if(p.buf.length>12)p.buf.shift();}
-function peerCarMesh(p){if(p.carMesh||!carModels.light)return;const m=carModels.light.clone();m.visible=true;p.car.add(m);p.carMesh=m;}
+function peerCarMesh(p){if(p.carMesh)return;let src=carModels.gmc;if(p.carId==='haval'){if(!carModels.haval){loadHaval().catch(()=>{});return;}src=carModels.haval;}if(!src)return;const m=src.clone();m.visible=true;p.car.add(m);p.carMesh=m;}
 function cloneMan(){if(!MAN.ok)return null;const ud=MAN.g.userData;MAN.g.userData={};const c=MAN.g.clone(true);MAN.g.userData=ud;
   const srcMesh=[],dstMesh=[],bones={};MAN.g.traverse(o=>{if(o.isSkinnedMesh)srcMesh.push(o);});c.traverse(o=>{if(o.isSkinnedMesh)dstMesh.push(o);if(o.isBone)bones[o.name]=o;});
   dstMesh.forEach((m,i)=>{const s=srcMesh[i];m.bind(new T.Skeleton(s.skeleton.bones.map(b=>bones[b.name]),s.skeleton.boneInverses),s.bindMatrix);});
@@ -2726,7 +2738,7 @@ function worldTick(dt,now){
 /* title screen */
 document.body.classList.add('title');
 document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='title')return;
-  {const nk=document.getElementById('nick');NET.name=(nk.value||'').trim().slice(0,16);if(NET.name)lsSet('kassab_name',NET.name);nk.blur();nk.hidden=true;netStart();}   // online starts with the drive
+  {const nk=document.getElementById('nick');NET.name=(nk.value||'').trim().slice(0,16);if(NET.name)lsSet('kassab_name',NET.name);nk.blur();nk.hidden=true;document.getElementById('carPick').hidden=true;netStart();}   // online starts with the drive
   game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();if(!station)tune(1); // radio starts with the same tap as the engine
   // full screen + landscape where the browser allows it (hides the bars, so fewer edge swipes); ignored where refused
   try{const el=document.documentElement,fs=el.requestFullscreen||el.webkitRequestFullscreen;if(fs){const pr=fs.call(el,{navigationUI:'hide'});if(pr&&pr.then)pr.then(()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}}catch(e){}
