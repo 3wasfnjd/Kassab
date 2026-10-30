@@ -2370,12 +2370,12 @@ function makeManClips(M,T){
 /* the characters: the man in thobe (models/man.glb) drives the GMC; the owner himself (models/aboden.glb) drives the Haval and dances when he steps out.
    Both are the owner's Tripo models, slimmed to 9k triangles, with procedural clips; the procedural shaib is the fallback */
 const HEROES={};
-function loadHero(key,url){return fetch(url).then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>parseSkinnedGLB(ab,T)).then(M=>{
+function loadHero(key,url,h){return fetch(url).then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>parseSkinnedGLB(ab,T)).then(M=>{
   const clips=makeManClips(M,T);   // built in the model's own frame, before it is turned and scaled for the world
-  const g=new T.Group();M.root.rotation.y=-Math.PI/2;M.root.scale.setScalar(1.75);g.add(M.root);   // model faces +x and is 1 unit tall
+  const g=new T.Group();M.root.rotation.y=-Math.PI/2;M.root.scale.setScalar(h||1.75);g.add(M.root);   // model faces +x and is 1 unit tall
   M.mesh.castShadow=true;M.mesh.receiveShadow=true;g.userData.anim={mixer:new T.AnimationMixer(M.root),clips,current:null};AA.three.play(g,'idle',0);
   g.visible=false;HEROES[key]={g,ok:true};if(key==='thobe')window.__man_ok=1;}).catch(e=>console.warn(url,e));}
-loadHero('thobe','models/man.glb');loadHero('aboden','models/aboden.glb');
+loadHero('thobe','models/man.glb',1.75);loadHero('aboden','models/aboden.glb',1.5);   // the owner's figure is stocky with a big head: shorter so he sits in scale with the world's people
 function heroKey(id){return (id||CARSEL)==='haval'?'aboden':'thobe';}
 const MAN={get ok(){const h=HEROES[heroKey()];return !!(h&&h.ok);},get g(){const h=HEROES[heroKey()];return h?h.g:null;}};
 function heroIdle(key){return (key||heroKey())==='aboden'?'dance':'idle';}
@@ -2642,7 +2642,7 @@ footBtn.addEventListener('click',()=>{if(FOOT.st==='off')footOut();else if(FOOT.
 let heroTag=null;
 function heroTagStep(){const want=FOOT.st==='on'&&heroKey()==='aboden'&&FOOT.g;
   if(want&&!heroTag){heroTag=tagSprite('عبودين',256,64,'800 34px "Baloo Bhaijaan 2",Tahoma,sans-serif');heroTag.scale.set(2.2,0.55,1);scene.add(heroTag);}
-  if(heroTag){heroTag.visible=!!want;if(want)heroTag.position.set(FOOT.x,FOOT.y+(FOOT.sit?1.55:2.2),FOOT.z);}}
+  if(heroTag){heroTag.visible=!!want;if(want)heroTag.position.set(FOOT.x,FOOT.y+(FOOT.sit?1.35:1.95),FOOT.z);}}
 function footPlay(c,ts){if(FOOT.clip!==c){FOOT.clip=c;AA.three.play(FOOT.g,c,0.2);}const a=FOOT.g.userData.anim;if(a&&a.current)a.current.timeScale=ts||1;}
 function stepFoot(dt){
   if(FOOT.st==='off'){FOOT.camW=Math.max(0,FOOT.camW-dt*1.6);return;}
