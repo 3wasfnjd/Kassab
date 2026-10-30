@@ -2351,6 +2351,15 @@ function makeManClips(M,T){
     idle:clip('idle',3,10,w=>({r:{Spine02:[['z',-1.2*S(w)]],Head:[['z',1*S(w)],['y',4*S(w*0.5)]],L_Upperarm:[['x',4],['z',1.5*S(w)]],R_Upperarm:[['x',-4],['z',1.5*S(w)]],L_Forearm:[['z',8]],R_Forearm:[['z',8]]},root:[0,-0.003*S(w),0]})),
     walk:clip('walk',1.05,24,w=>gait(w,22,48,5,6,3,0.012,4)),
     run:clip('run',0.64,24,w=>gait(w,30,72,12,22,14,0.026,5)),
+    // a happy bouncing dance: four beats a loop, hips swaying side to side, arms pumping in turn
+    dance:clip('dance',2.0,24,w=>({r:{
+      Hip:[['y',14*S(w)]],Spine01:[['x',6*S(w)],['y',-8*S(w)]],Spine02:[['x',4*S(w)],['z',-4-3*Cc(2*w)]],Head:[['z',7*S(2*w)],['x',-5*S(w)]],
+      L_Thigh:[['z',10+8*Math.max(0,S(w))],['y',6]],R_Thigh:[['z',10+8*Math.max(0,-S(w))],['y',-6]],
+      L_Calf:[['z',-18-14*(0.5+0.5*Cc(2*w))-16*Math.max(0,S(w))]],R_Calf:[['z',-18-14*(0.5+0.5*Cc(2*w))-16*Math.max(0,-S(w))]],
+      L_Foot:[['z',8]],R_Foot:[['z',8]],
+      L_Upperarm:[['x',22],['z',35+55*Math.max(0,S(w))]],R_Upperarm:[['x',-22],['z',35+55*Math.max(0,-S(w))]],
+      L_Forearm:[['z',80-25*Math.max(0,S(w))]],R_Forearm:[['z',80-25*Math.max(0,-S(w))]]},
+      root:[0,-0.035-0.022*Math.abs(S(2*w)),0.025*S(w)]})),
     sit_floor:clip('sit_floor',3,10,w=>({r:{
       L_Thigh:[['z',84],['y',48]],R_Thigh:[['z',84],['y',-48]],L_Calf:[['z',-148],['x',-18]],R_Calf:[['z',-148],['x',18]],L_Foot:[['z',-20]],R_Foot:[['z',-20]],
       L_Upperarm:[['x',10],['z',24]],R_Upperarm:[['x',-10],['z',24]],L_Forearm:[['z',40],['y',15]],R_Forearm:[['z',40],['y',-15]],
@@ -2358,13 +2367,18 @@ function makeManClips(M,T){
   return clips;
 }
 
-/* the main character (models/man.glb: the owner's model, slimmed to 9k triangles, 1024 texture); falls back to the procedural shaib */
-const MAN={g:null,ok:false};
-fetch('models/man.glb').then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>parseSkinnedGLB(ab,T)).then(M=>{
+/* the characters: the man in thobe (models/man.glb) drives the GMC; the owner himself (models/aboden.glb) drives the Haval and dances when he steps out.
+   Both are the owner's Tripo models, slimmed to 9k triangles, with procedural clips; the procedural shaib is the fallback */
+const HEROES={};
+function loadHero(key,url){return fetch(url).then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>parseSkinnedGLB(ab,T)).then(M=>{
   const clips=makeManClips(M,T);   // built in the model's own frame, before it is turned and scaled for the world
   const g=new T.Group();M.root.rotation.y=-Math.PI/2;M.root.scale.setScalar(1.75);g.add(M.root);   // model faces +x and is 1 unit tall
   M.mesh.castShadow=true;M.mesh.receiveShadow=true;g.userData.anim={mixer:new T.AnimationMixer(M.root),clips,current:null};AA.three.play(g,'idle',0);
-  g.visible=false;MAN.g=g;MAN.ok=true;window.__man_ok=1;}).catch(e=>console.warn('man.glb',e));
+  g.visible=false;HEROES[key]={g,ok:true};if(key==='thobe')window.__man_ok=1;}).catch(e=>console.warn(url,e));}
+loadHero('thobe','models/man.glb');loadHero('aboden','models/aboden.glb');
+function heroKey(id){return (id||CARSEL)==='haval'?'aboden':'thobe';}
+const MAN={get ok(){const h=HEROES[heroKey()];return !!(h&&h.ok);},get g(){const h=HEROES[heroKey()];return h?h.g:null;}};
+function heroIdle(key){return (key||heroKey())==='aboden'?'dance':'idle';}
 function heroInst(){if(MAN.ok)return MAN.g;const b=getBuilt('shaib',{seed:121,stoop:0,beard:0.45,grey:0,bisht:'none'}),g=AA.three.instance(b);g.children.forEach(o=>{if(o.name==='wood')o.visible=false;});return g;}
 const CAR_LEN=5.5;
 // published page: geometry as JSON + JPEG texture (the host does not serve .glb); repo build: the .glb itself
@@ -2613,7 +2627,7 @@ function footOut(){if(FOOT.st!=='off'||game.mode!=='play'||PH.on)return;
   if(KS.st!=='off'){showToast('شيل الكشتة أول',1.8);return;}
   FOOT.st='stop';footBtn.classList.add('on');footBtn.setAttribute('aria-pressed','true');}
 function footBegin(){
-  if(!FOOT.g||(MAN.ok&&FOOT.g!==MAN.g))FOOT.g=heroInst();scene.add(FOOT.g);
+  if(!FOOT.g||(MAN.ok&&FOOT.g!==MAN.g)){if(FOOT.g&&FOOT.g.parent)FOOT.g.parent.remove(FOOT.g);FOOT.g=heroInst();}scene.add(FOOT.g);
   const sd=[1,-1].find(k=>{const x=S.x+Math.cos(S.h)*1.75*k,z=S.z-Math.sin(S.h)*1.75*k;return !footBlockedAt(x,z);})||1;   // driver door (left) first
   FOOT.x=S.x+Math.cos(S.h)*1.75*sd+Math.sin(S.h)*0.3;FOOT.z=S.z-Math.sin(S.h)*1.75*sd+Math.cos(S.h)*0.3;FOOT.y=H(FOOT.x,FOOT.z);
   FOOT.h=S.h+PI/2*sd;FOOT.cyaw=S.h;FOOT.sp=0;FOOT.px=FOOT.x;FOOT.pz=FOOT.z;FOOT.g.visible=true;FOOT.clip=null;FOOT.st='on';
@@ -2653,7 +2667,7 @@ function stepFoot(dt){
   FOOT.y+=(H(FOOT.x,FOOT.z)-FOOT.y)*Math.min(1,dt*14);
   FOOT.g.position.set(FOOT.x,FOOT.y-0.02,FOOT.z);FOOT.g.rotation.y=FOOT.h;
   const hasRun=!!(FOOT.g.userData.anim&&FOOT.g.userData.anim.clips.run);
-  if(FOOT.sp>0.15){if(hasRun)FOOT.sp>2.6?footPlay('run',FOOT.sp/3.5):footPlay('walk',Math.max(0.5,FOOT.sp/1.33));else footPlay('walk',Math.min(3,FOOT.sp/(FOOT.sp>2.5?1.3:1.05)));}else footPlay('idle',1);
+  if(FOOT.sp>0.15){if(hasRun)FOOT.sp>2.6?footPlay('run',FOOT.sp/3.5):footPlay('walk',Math.max(0.5,FOOT.sp/1.33));else footPlay('walk',Math.min(3,FOOT.sp/(FOOT.sp>2.5?1.3:1.05)));}else footPlay(hasRun?heroIdle():'idle',1);
   if(FOOT.g.userData.anim)FOOT.g.userData.anim.mixer.update(dt);
   {const near=Math.hypot(FOOT.x-S.x,FOOT.z-S.z)<4.5;if(near===ftInBtn.hidden)ftInBtn.hidden=!near;}   // a big 'get in' button appears beside the car
   // the camera swings round behind him while he walks
@@ -2726,8 +2740,8 @@ function netDrop(p){[p.car,p.tag,p.bub,p.man].forEach(o=>{if(o&&o.parent)o.paren
 function netClearPeers(){NET.peers.forEach(netDrop);NET.peers.clear();NET.id=null;}
 function netPush(p,d){p.buf.push({t:performance.now()/1000,d});if(p.buf.length>12)p.buf.shift();}
 function peerCarMesh(p){if(p.carMesh)return;let src=carModels.gmc;if(p.carId==='haval'){if(!carModels.haval){loadHaval().catch(()=>{});return;}src=carModels.haval;}if(!src)return;const m=src.clone();m.visible=true;p.car.add(m);p.carMesh=m;}
-function cloneMan(){if(!MAN.ok)return null;const ud=MAN.g.userData;MAN.g.userData={};const c=MAN.g.clone(true);MAN.g.userData=ud;
-  const srcMesh=[],dstMesh=[],bones={};MAN.g.traverse(o=>{if(o.isSkinnedMesh)srcMesh.push(o);});c.traverse(o=>{if(o.isSkinnedMesh)dstMesh.push(o);if(o.isBone)bones[o.name]=o;});
+function cloneMan(key){const H0=HEROES[key||'thobe'];if(!H0||!H0.ok)return null;const src=H0.g;const ud=src.userData;src.userData={};const c=src.clone(true);src.userData=ud;
+  const srcMesh=[],dstMesh=[],bones={};src.traverse(o=>{if(o.isSkinnedMesh)srcMesh.push(o);});c.traverse(o=>{if(o.isSkinnedMesh)dstMesh.push(o);if(o.isBone)bones[o.name]=o;});
   dstMesh.forEach((m,i)=>{const s=srcMesh[i];m.bind(new T.Skeleton(s.skeleton.bones.map(b=>bones[b.name]),s.skeleton.boneInverses),s.bindMatrix);});
   c.userData.anim={mixer:new T.AnimationMixer(c.children[0]),clips:ud.anim.clips,current:null};AA.three.play(c,'idle',0);return c;}
 const _np=new T.Vector3();
@@ -2756,13 +2770,13 @@ function stepNet(dt){
     if(p.ks)p.ks.root.visible=!far;
     p.cur2=p.mode===2?[c.d[5],c.d[6]]:null;
     const seated=p.mode===2?{x:c.d[5],z:c.d[6],h:c.d[7]}:(p.mode===0&&p.ks)?p.ks.seats[0]:null;
-    if(seated){if(!p.man){p.man=cloneMan();if(p.man)scene.add(p.man);}
+    if(seated){if(!p.man){p.man=cloneMan(heroKey(p.carId||'gmc'));if(p.man)scene.add(p.man);}
       if(p.man){let sy=seated.y;if(sy==null){sy=H(seated.x,seated.z)+0.05;NET.peers.forEach(q=>{if(q.ks)q.ks.seats.forEach(st=>{if(Math.hypot(st.x-seated.x,st.z-seated.z)<0.3)sy=st.y;});});if(KS.set)KS.set.seats.forEach(st=>{if(Math.hypot(st.x-seated.x,st.z-seated.z)<0.3)sy=st.y;});}
         p.man.visible=!far;p.man.position.set(seated.x,sy-0.02,seated.z);p.man.rotation.y=seated.h;const an=p.man.userData.anim;if(an.name!=='sit_floor')AA.three.play(p.man,'sit_floor',0.3);if(an.current)an.current.timeScale=1;an.mixer.update(dt);
         tx=seated.x;tz=seated.z;ty=sy+1.6;}}
-    else if(p.mode===1){if(!p.man){p.man=cloneMan();if(p.man)scene.add(p.man);}
+    else if(p.mode===1){if(!p.man){p.man=cloneMan(heroKey(p.carId||'gmc'));if(p.man)scene.add(p.man);}
       if(p.man){const mx=L(5),mz=L(6),mh=LA(7),sp=c.d[8];p.man.visible=!far;p.man.position.set(mx,H(mx,mz)-0.02,mz);p.man.rotation.y=mh;
-        const an=p.man.userData.anim,cl=sp>2.6?'run':sp>0.15?'walk':'idle';if(an.name!==cl)AA.three.play(p.man,cl,0.2);if(an.current)an.current.timeScale=cl==='run'?sp/3.5:cl==='walk'?Math.max(0.5,sp/1.33):1;
+        const an=p.man.userData.anim,cl=sp>2.6?'run':sp>0.15?'walk':heroIdle(heroKey(p.carId||'gmc'));if(an.name!==cl)AA.three.play(p.man,cl,0.2);if(an.current)an.current.timeScale=cl==='run'?sp/3.5:cl==='walk'?Math.max(0.5,sp/1.33):1;
         an.mixer.update(dt);tx=mx;tz=mz;ty=H(mx,mz)+2.25;}}
     else if(p.man&&p.man.visible)p.man.visible=false;
     p.tag.position.set(tx,ty,tz);p.tag.visible=!far;
