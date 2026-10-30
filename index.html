@@ -219,7 +219,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 #err{position:fixed;inset:auto 16px 50% 16px;text-align:center;color:var(--ink);font-size:15px}
 </style>
 </head>
-<body>
+<body class="title">
 
 
 <canvas id="c"></canvas>
@@ -303,7 +303,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
   <h1>كسّاب</h1>
   <p>اهداء لصديقي ابوحصه 💕</p>
   <input id="nick" maxlength="16" placeholder="اسمك في الأونلاين" dir="auto" autocomplete="off" hidden>
-  <div id="carPick" hidden><button data-car="gmc">جمس</button><button data-car="haval">هافال · عبودين</button></div>
+  <div id="carPick" hidden><button data-car="gmc">جمس</button><button data-car="haval">هافال</button></div>
   <button id="start" hidden>ابدأ</button>
 </div>
 
@@ -2411,7 +2411,7 @@ function carMesh({g,tex},len){len=len||CAR_LEN;g.computeBoundingBox();const bb=g
   m.scale.setScalar(k);m.position.y=-bb.min.y*k;m.userData.sh=true;m.castShadow=true;m.receiveShadow=true;m.userData.bb=bb;m.userData.k=k;m.userData.len=len;return m;}
 // Saudi plate (2006 design, 335x155 mm): Arabic digits/letters on top, Latin below, digits left, letters right,
 // side strip with the emblem, السعودية, K S A and the category mark — blue strip with a down-pointing triangle
-function saudiPlate(){
+function saudiPlate(pl){pl=pl||{na:'٥٤٥٢',la:'ب ك ك',ne:'5452',le:'B K K'};
   const c=document.createElement('canvas');c.width=2010;c.height=930;const x=c.getContext('2d'),W=1340,H=620;x.scale(1.5,1.5); // drawn at 1.5x for a crisper plate
   const R=(a,b,w,h,r)=>{x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();};
   x.fillStyle='#f7f7f4';R(6,6,W-12,H-12,46);x.fill();x.lineWidth=16;x.strokeStyle='#151515';x.stroke();
@@ -2430,21 +2430,25 @@ function saudiPlate(){
   x.strokeStyle='#151515';x.lineWidth=9;x.beginPath();x.moveTo(20,H/2);x.lineTo(SX,H/2);x.moveTo(SX/2,24);x.lineTo(SX/2,H-24);x.stroke();
   x.fillStyle='#111';x.textAlign='center';x.textBaseline='middle';
   x.font='bold 168px "Noto Naskh Arabic","Geeza Pro",Tahoma,sans-serif';x.direction='rtl';
-  x.fillText('٥٤٥٢',SX/4,H/4+14);x.fillText('ب ك ك',SX*3/4,H/4+10);
+  x.fillText(pl.na,SX/4,H/4+14);x.fillText(pl.la,SX*3/4,H/4+10);
   x.direction='ltr';x.font='bold 178px "DIN Alternate",Arial,Helvetica,sans-serif';
-  x.fillText('5452',SX/4,H*3/4+8);x.fillText('B K K',SX*3/4,H*3/4+8);
+  x.fillText(pl.ne,SX/4,H*3/4+8);x.fillText(pl.le,SX*3/4,H*3/4+8);
   const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=renderer.capabilities.getMaxAnisotropy();
   t.onUpdate=null;return t;}
 let plates=null;
 function fitPlates(m){
   const bb=m.userData.bb,k=m.userData.k,H2=(bb.max.y-bb.min.y)*k;
-  if(!plates){const tex=saudiPlate(),mat=new T.MeshStandardMaterial({map:tex,roughness:0.45,metalness:0.05,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:0.32}); // faint self-light keeps it readable in the bumper's shade
+  if(!plates){const tex=saudiPlate(PLATE_NUM.gmc);PLATE_TEX.gmc=tex;const mat=new T.MeshStandardMaterial({map:tex,roughness:0.45,metalness:0.05,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:0.32}); // faint self-light keeps it readable in the bumper's shade
     plates=[0,1].map(i=>{const pl=new T.Mesh(new T.PlaneGeometry(0.335,0.155),mat);pl.renderOrder=1;pl.userData.keep=true;body.add(pl);return pl;});
     plates[1].rotation.y=Math.PI;plates.forEach(pl=>pl.scale.setScalar(1.55));} // the model is scaled a bit larger than life, so the plate follows
-  plates[0].position.set(0,H2*PLATE.fy,(m.userData.len||CAR_LEN)/2+PLATE.fz);   // front bumper
-  plates[1].position.set(0,H2*PLATE.ry,-(m.userData.len||CAR_LEN)/2-PLATE.rz);  // tailgate / rear bumper
+  // each car has its own number: the Haval is س أ ر ٧٧٣٥
+  const key=m===carModels.haval?'haval':'gmc';if(!PLATE_TEX[key])PLATE_TEX[key]=saudiPlate(PLATE_NUM[key]);if(plates[0].material.map!==PLATE_TEX[key]){plates[0].material.map=plates[0].material.emissiveMap=PLATE_TEX[key];plates[0].material.needsUpdate=true;}
+  const PL=key==='haval'?PLATE_HV:PLATE;
+  plates[0].position.set(0,H2*PL.fy,(m.userData.len||CAR_LEN)/2+PL.fz);   // front bumper
+  plates[1].position.set(PL.rx||0,H2*PL.ry,-(m.userData.len||CAR_LEN)/2-PL.rz);  // tailgate / rear bumper
 }
-const PLATE={fy:0.255,fz:0.02,ry:0.33,rz:0.02};
+const PLATE={fy:0.255,fz:0.02,ry:0.33,rz:0.02},PLATE_HV={fy:0.39,fz:0.0,ry:0.305,rz:0.06,rx:0.52};window.__plateHV=PLATE_HV;
+const PLATE_NUM={gmc:{na:'٥٤٥٢',la:'ب ك ك',ne:'5452',le:'B K K'},haval:{na:'٧٧٣٥',la:'س أ ر',ne:'7735',le:'S A R'}},PLATE_TEX={};
 // two versions: the original model as sent (511k triangles, 2048 texture) for the title page only, the light one (25k) for driving
 const carModels={light:null,hq:null,gmc:null,haval:null};
 function useCar(m){
@@ -2464,7 +2468,7 @@ function dropHQ(){const m=carModels.hq;if(!m)return;carModels.hq=null;if(carMode
 // title page shows only the original model; the light one waits hidden until driving starts (or the original fails to load)
 let origFailed=false;
 /* car choice: the GMC or the owner's Haval H9 (models/haval.glb, 49k triangles) */
-let CARSEL=lsGet('kassab_car')==='haval'?'haval':'gmc';
+let CARSEL='gmc';   // the GMC always shows first; the Haval is picked on the title page
 let havalP=null;
 function loadHaval(){if(!havalP)havalP=loadGLB('models/haval.glb').then(d=>{const m=carMesh(d,4.86);m.material.roughness=0.45;m.visible=false;carModels.haval=m;return m;});return havalP;}
 function pickCar(id){CARSEL=id;lsSet('kassab_car',id);document.querySelectorAll('#carPick button').forEach(b=>b.classList.toggle('on',b.dataset.car===id));
@@ -2640,9 +2644,10 @@ ftInBtn.addEventListener('click',()=>{if(FOOT.st==='on')footIn();});
 ftSitBtn.addEventListener('click',()=>{if(FOOT.st!=='on')return;if(FOOT.sit)footStand();else if(FOOT.seatCand)footSit(FOOT.seatCand);});
 footBtn.addEventListener('click',()=>{if(FOOT.st==='off')footOut();else if(FOOT.st==='stop'){FOOT.st='off';footBtn.classList.remove('on');}else footIn();});
 let heroTag=null;
-function heroTagStep(){const want=FOOT.st==='on'&&heroKey()==='aboden'&&FOOT.g;
-  if(want&&!heroTag){heroTag=tagSprite('عبودين',256,64,'800 34px "Baloo Bhaijaan 2",Tahoma,sans-serif');heroTag.scale.set(2.2,0.55,1);scene.add(heroTag);}
-  if(heroTag){heroTag.visible=!!want;if(want)heroTag.position.set(FOOT.x,FOOT.y+(FOOT.sit?1.35:1.95),FOOT.z);}}
+function heroTagStep(){const want=FOOT.st==='on'&&NET.name&&FOOT.g;   // the name typed on the title page floats over your own character
+  if(want&&heroTag&&heroTag.userData.n!==NET.name){scene.remove(heroTag);heroTag.material.map.dispose();heroTag.material.dispose();heroTag=null;}
+  if(want&&!heroTag){heroTag=tagSprite(NET.name,256,64,'800 34px "Baloo Bhaijaan 2",Tahoma,sans-serif');heroTag.scale.set(2.2,0.55,1);heroTag.userData.n=NET.name;scene.add(heroTag);}
+  if(heroTag){heroTag.visible=!!want;if(want)heroTag.position.set(FOOT.x,FOOT.y+(heroKey()==='aboden'?(FOOT.sit?1.35:1.95):(FOOT.sit?1.55:2.2)),FOOT.z);}}
 function footPlay(c,ts){if(FOOT.clip!==c){FOOT.clip=c;AA.three.play(FOOT.g,c,0.2);}const a=FOOT.g.userData.anim;if(a&&a.current)a.current.timeScale=ts||1;}
 function stepFoot(dt){
   if(FOOT.st==='off'){FOOT.camW=Math.max(0,FOOT.camW-dt*1.6);return;}
