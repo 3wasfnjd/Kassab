@@ -2288,19 +2288,19 @@ function makeManClips(M,T){
   const S=Math.sin,Cc=Math.cos;
   const gait=(w,legA,kneeA,armA,elbow,lean,bob,twist)=>({
     r:{L_Thigh:[['z',legA*S(w)]],R_Thigh:[['z',-legA*S(w)]],
-       L_Calf:[['z',-kneeA*Math.max(0,-Cc(w-0.6))-6]],R_Calf:[['z',-kneeA*Math.max(0,Cc(w-0.6))-6]],
-       L_Foot:[['z',8*S(w)]],R_Foot:[['z',-8*S(w)]],
-       L_Upperarm:[['x',-7],['z',-armA*S(w)]],R_Upperarm:[['x',7],['z',armA*S(w)]],
+       L_Calf:[['z',-kneeA*Math.pow(Math.max(0,Cc(w+0.35)),1.5)-5]],R_Calf:[['z',-kneeA*Math.pow(Math.max(0,-Cc(w+0.35)),1.5)-5]],
+       L_Foot:[['z',10*S(w)+6*Math.max(0,Cc(w+0.35))]],R_Foot:[['z',-10*S(w)+6*Math.max(0,-Cc(w+0.35))]],
+       L_Upperarm:[['x',6],['z',-armA*S(w)]],R_Upperarm:[['x',-6],['z',armA*S(w)]],
        L_Forearm:[['z',elbow+elbow*0.6*Math.max(0,-S(w))]],R_Forearm:[['z',elbow+elbow*0.6*Math.max(0,S(w))]],
        Hip:[['y',twist*S(w)]],Spine01:[['z',-lean*0.5],['y',-twist*1.4*S(w)]],Spine02:[['z',-lean*0.5]],Head:[['z',lean*0.6]]},
     root:[0,-bob*0.5+bob*Math.abs(Cc(w)),0]});
   const clips={
-    idle:clip('idle',3,10,w=>({r:{Spine02:[['z',-1.2*S(w)]],Head:[['z',1*S(w)],['y',4*S(w*0.5)]],L_Upperarm:[['x',-5],['z',1.5*S(w)]],R_Upperarm:[['x',5],['z',1.5*S(w)]],L_Forearm:[['z',8]],R_Forearm:[['z',8]]},root:[0,-0.003*S(w),0]})),
-    walk:clip('walk',1.0,24,w=>gait(w,24,42,16,12,3,0.012,5)),
-    run:clip('run',0.62,24,w=>gait(w,42,85,38,70,12,0.03,8)),
+    idle:clip('idle',3,10,w=>({r:{Spine02:[['z',-1.2*S(w)]],Head:[['z',1*S(w)],['y',4*S(w*0.5)]],L_Upperarm:[['x',4],['z',1.5*S(w)]],R_Upperarm:[['x',-4],['z',1.5*S(w)]],L_Forearm:[['z',8]],R_Forearm:[['z',8]]},root:[0,-0.003*S(w),0]})),
+    walk:clip('walk',1.05,24,w=>gait(w,22,48,5,6,3,0.012,4)),
+    run:clip('run',0.64,24,w=>gait(w,30,72,12,22,14,0.026,5)),
     sit_floor:clip('sit_floor',3,10,w=>({r:{
       L_Thigh:[['z',84],['y',48]],R_Thigh:[['z',84],['y',-48]],L_Calf:[['z',-148],['x',-18]],R_Calf:[['z',-148],['x',18]],L_Foot:[['z',-20]],R_Foot:[['z',-20]],
-      L_Upperarm:[['x',-14],['z',24]],R_Upperarm:[['x',14],['z',24]],L_Forearm:[['z',40],['y',15]],R_Forearm:[['z',40],['y',-15]],
+      L_Upperarm:[['x',10],['z',24]],R_Upperarm:[['x',-10],['z',24]],L_Forearm:[['z',40],['y',15]],R_Forearm:[['z',40],['y',-15]],
       Spine01:[['z',4]],Spine02:[['z',3-1*S(w)]],Head:[['z',-4]]},root:[0,-0.43,0]}))};
   return clips;
 }
@@ -2308,9 +2308,9 @@ function makeManClips(M,T){
 /* the main character (models/man.glb: the owner's model, slimmed to 9k triangles, 1024 texture); falls back to the procedural shaib */
 const MAN={g:null,ok:false};
 fetch('models/man.glb').then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>parseSkinnedGLB(ab,T)).then(M=>{
+  const clips=makeManClips(M,T);   // built in the model's own frame, before it is turned and scaled for the world
   const g=new T.Group();M.root.rotation.y=-Math.PI/2;M.root.scale.setScalar(1.75);g.add(M.root);   // model faces +x and is 1 unit tall
-  M.mesh.castShadow=true;M.mesh.receiveShadow=true;
-  const clips=makeManClips(M,T);g.userData.anim={mixer:new T.AnimationMixer(M.root),clips,current:null};AA.three.play(g,'idle',0);
+  M.mesh.castShadow=true;M.mesh.receiveShadow=true;g.userData.anim={mixer:new T.AnimationMixer(M.root),clips,current:null};AA.three.play(g,'idle',0);
   g.visible=false;MAN.g=g;MAN.ok=true;window.__man_ok=1;}).catch(e=>console.warn('man.glb',e));
 function heroInst(){if(MAN.ok)return MAN.g;const b=getBuilt('shaib',{seed:121,stoop:0,beard:0.45,grey:0,bisht:'none'}),g=AA.three.instance(b);g.children.forEach(o=>{if(o.name==='wood')o.visible=false;});return g;}
 const CAR_LEN=5.5;
