@@ -56,14 +56,17 @@ body.title .brand{width:84px}
   border-radius:16px;border:1.5px solid var(--rim);background:rgba(58,40,22,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff;direction:rtl;font:700 12px var(--font)}
 #wxPanel[hidden]{display:none}
 /* landscape: the on-screen interface fades away after a few seconds without a new touch (controls keep working); any touch brings it back */
-.hud,#map,#reset,#radio,#wxBtn,#camBtn,#awd,.pads,#knobBase,#wx,.brand{transition:opacity .5s}
-body.uihide .hud,body.uihide #map,body.uihide #reset,body.uihide #radio,body.uihide #wxBtn,body.uihide #camBtn,body.uihide #wx,body.uihide .brand{opacity:0}
+.hud,#map,#reset,#radio,#wxBtn,#camBtn,#ksBtn,#awd,.pads,#knobBase,#wx,.brand{transition:opacity .5s}
+body.uihide .hud,body.uihide #map,body.uihide #reset,body.uihide #radio,body.uihide #wxBtn,body.uihide #camBtn,body.uihide #ksBtn,body.uihide #wx,body.uihide .brand{opacity:0}
 body.uihide .pads,body.uihide #knobBase,body.uihide #awd{opacity:.14}   /* driving controls stay faintly visible and keep working */
 #camBtn{position:fixed;top:calc(214px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
+#ksBtn{position:fixed;top:calc(260px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
+  border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
+#ksBtn.on{border-color:#ffb35c;color:#ffb35c;background:var(--glass-hi)}
 #photoUI{position:fixed;inset:0;display:none;pointer-events:none;z-index:20;font:700 13px var(--font);color:#fff}
 body.photo #photoUI{display:block}
-body.photo .hud,body.photo #map,body.photo .pads,body.photo #steer,body.photo #wx,body.photo #reset,body.photo #radio,body.photo #wxBtn,body.photo #wxPanel,body.photo #camBtn,body.photo #rot,body.photo #toast,body.photo #vig,body.photo .brand{display:none!important}
+body.photo .hud,body.photo #map,body.photo .pads,body.photo #steer,body.photo #wx,body.photo #reset,body.photo #radio,body.photo #wxBtn,body.photo #wxPanel,body.photo #camBtn,body.photo #ksBtn,body.photo #rot,body.photo #toast,body.photo #vig,body.photo .brand{display:none!important}
 #photoUI button{pointer-events:auto;border:1.5px solid rgba(255,255,255,.55);background:rgba(30,22,14,.38);color:#fff;font:700 13px var(--font);padding:0;display:grid;place-items:center}
 #phTop{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);display:flex;gap:6px;direction:rtl}
 #phTop button{height:34px;padding:0 14px;border-radius:17px}#phTop button.on{background:rgba(255,255,255,.9);color:#2a1d10;border-color:#fff}
@@ -146,7 +149,7 @@ body.title:not(.intro) #load{display:flex}
 @media (prefers-reduced-motion:reduce){#start.show{animation:none}}
 #start:active{transform:translateY(3px);box-shadow:0 1px 0 #a9773a}
 #start:focus-visible{outline:3px solid #fff;outline-offset:4px}
-body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build,body.title #wxBtn,body.title #wxPanel,body.title #camBtn{display:none!important}
+body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build,body.title #wxBtn,body.title #wxPanel,body.title #camBtn,body.title #ksBtn{display:none!important}
 #err{position:fixed;inset:auto 16px 50% 16px;text-align:center;color:var(--ink);font-size:15px}
 </style>
 </head>
@@ -177,6 +180,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <button id="radio" aria-label="الراديو"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3" fill="currentColor"/><circle cx="17" cy="16" r="3" fill="currentColor"/></svg></button>
 <button id="wxBtn" aria-label="التحكم بالطقس"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="3.4"/><path d="M9 2.2v1.6M2.2 9h1.6M4.2 4.2l1.1 1.1M13.8 4.2l-1.1 1.1"/><path d="M8.5 19.5h9a3.3 3.3 0 0 0 .2-6.6 4.6 4.6 0 0 0-8.7 1.1 2.8 2.8 0 0 0-.5 5.5z" fill="rgba(0,0,0,.25)"/></svg></button>
 <button id="camBtn" aria-label="وضع التصوير"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg></button>
+<button id="ksBtn" aria-label="كشتة" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1.6 2.4 4 4.1 4 7.2a4 4 0 0 1-8 0c0-1.4.6-2.4 1.5-3.3.2 1.3.9 2 1.7 2.3C11 7.3 11.2 5 12 3z"/><path d="M4 20.5l16-4M4 16.5l16 4"/></svg></button>
 <div id="photoUI" aria-label="وضع التصوير">
   <div id="phLook"></div>
   <div id="phTop"><button data-m="drone" class="on">درون</button><button data-m="cam">كاميرا</button><button id="phFreeze" class="on" aria-label="تجميد اللقطة">⏸ تجميد</button></div>
@@ -927,6 +931,28 @@ function addDyn(geo,half,x,z,yaw,mass){
 /* ---------------- open world: Aboden asset library (villages, badia, palms, camels, people) ---------------- */
 const AAok=!!(window.AA&&AA.three&&AA.assets);
 const PI=Math.PI;
+/* kashta kit pieces the asset library does not have: an enamel tea kettle (ابريق), a sadu wedge cushion (مركى) and a metal camping chest (العزبة) */
+if(AAok){const KB=()=>new AA.Builder(),lerpK=(a,b,t)=>a+(b-a)*t;
+  AA.assets.ks_teapot={id:'ks_teapot',name:'ابريق',category:'kit',schema:[],clips:[],generate:(p,q)=>{const B=KB(),D=KB(),C=[0.93,0.93,0.9],R=[0.62,0.12,0.1];
+    AA.lathe(B,[[0,0],[0.002,0.072],[0.01,0.082],[0.045,0.09],[0.085,0.083],[0.108,0.066],[0.118,0.046],[0.121,0.043],[0.124,0.04],[0.132,0.036],[0.137,0.014],[0.146,0.009],[0.152,0]],
+      {sides:14,capBottom:true,color:(y,a,i)=>(i===4||i===5)?R:(i>=9?R:C)});
+    AA.loft(B,{path:AA.bezier([[0,0.03,0.07],[0,0.075,0.125],[0,0.105,0.15],[0,0.128,0.178]],8),sides:6,up:()=>[1,0,0],capEnd:true,radius:t=>lerpK(0.017,0.007,t),color:()=>C});
+    AA.loft(D,{path:AA.bezier([[0,0.112,-0.07],[0,0.215,-0.05],[0,0.215,0.05],[0,0.112,0.07]],10),sides:5,up:()=>[1,0,0],radius:()=>0.0075,color:()=>[1,1,1]});
+    return AA.finalize('ks_teapot',{metal:{builder:B,material:{kind:'porcelain',roughness:0.28,metalness:0.15}},dark:{builder:D,material:{kind:'dark',roughness:0.6,color:[0.07,0.06,0.05]}}},{height:0.22,radius:0.14,collider:{type:'none'}});}};
+  AA.assets.ks_markaa={id:'ks_markaa',name:'مركى',category:'kit',schema:[],clips:[],generate:(p,q)=>{const B=KB(),E=KB(),Hh=0.42;
+    AA.roundBox(B,[0,Hh/2,0],[0.64,Hh,0.38],0.05,{seg:2,bulge:0.014,tile:1.2,color:(q2,n)=>n[1]<-0.5?[0.45,0.4,0.38]:[1,1,1]});
+    for(let i=0;i<B.vertexCount;i++){const y=B.pos[i*3+1],t=Math.min(1,Math.max(0,y/Hh));B.pos[i*3+2]*=lerpK(1,0.22,Math.pow(t,1.15));}   // squeeze the top into a ridge: the triangular profile
+    for(const sx of [-1,1])AA.lathe(E,[[0,0],[0.004,0.05],[0.012,0.05],[0.016,0]],{at:[sx*0.322,0.15,0],sides:8});
+    for(let i=0;i<E.vertexCount;i++){const x=E.pos[i*3],y=E.pos[i*3+1];const sx=Math.sign(x),lx=y-0.15;E.pos[i*3+1]=0.15+(x-sx*0.322);E.pos[i*3]=sx*0.322+lx*sx;}   // tassel discs on the two ends
+    return AA.finalize('ks_markaa',{sadu:{builder:B,material:{kind:'cloth',texture:'sadu',roughness:0.95}},cloth:{builder:E,material:{kind:'cloth',roughness:0.9,color:[0.55,0.12,0.1]}}},{height:Hh,radius:0.36,collider:{type:'none'}});}};
+  AA.assets.ks_box={id:'ks_box',name:'العزبة',category:'kit',schema:[],clips:[],generate:(p,q)=>{const B=KB(),D=KB(),G=[0.2,0.34,0.29];
+    AA.roundBox(B,[0,0.17,0],[0.72,0.3,0.42],0.025,{seg:1,color:()=>G});
+    AA.roundBox(B,[0,0.355,0],[0.73,0.08,0.43],0.03,{seg:1,color:()=>[0.24,0.4,0.34]});
+    AA.roundBox(D,[0,0.315,0],[0.735,0.018,0.435],0.006,{seg:1});
+    for(const sx of [-1,1])AA.loft(D,{path:[[sx*0.37,0.22,-0.07],[sx*0.4,0.24,-0.05],[sx*0.4,0.24,0.05],[sx*0.37,0.22,0.07]],sides:5,radius:()=>0.009});
+    AA.roundBox(D,[0,0.3,0.218],[0.06,0.07,0.012],0.004,{seg:1});
+    return AA.finalize('ks_box',{metal:{builder:B,material:{kind:'metal',roughness:0.55,metalness:0.25}},dark:{builder:D,material:{kind:'metal',roughness:0.4,metalness:0.6,color:[0.55,0.55,0.53]}}},{height:0.4,radius:0.42,collider:{type:'none'}});}};
+}
 const builtCache={};window.__builtCache=builtCache;
 // the camera looks down from 25-30 m, so buildings, walls and parked vehicles lose detail nobody can see:
 // each static asset is simplified once, with the error measured against its own size (about 1% of it)
@@ -1750,6 +1776,8 @@ function exitPhoto(){if(!PH.on||PH.land>0)return;if(PH.rec)stopRec();setFreeze(f
 function readInput(t){
   if(game.mode!=='play'&&!window.__autopilot){input.steer=0;input.gas=0;input.brake=0;input.hand=false;return;}
   if(PH.on){input.steer=0;input.gas=0;input.brake=(S.vF||0)>0.5?1:0;input.hand=false;return;}   // photo mode: the car brakes to a stop (never reverses)
+  if(KS.st!=='off'){const go=held.gas||keys.ArrowUp||keys.KeyW||(window.__autopilot&&window.__autopilot(t).gas>0);if(go&&KS.st!=='stop')ksLeave(true);
+    input.steer=0;input.gas=0;input.brake=(S.vF||0)>0.3?1:0;input.hand=false;return;}   // kashta: car stays parked; gas packs up
   if(window.__autopilot){Object.assign(input,window.__autopilot(t));return;}
   let s=touchSteer.val;if(keys.ArrowLeft||keys.KeyA)s=-1;if(keys.ArrowRight||keys.KeyD)s=1;
   input.steer+= (s-input.steer)*0.25;
@@ -1762,7 +1790,7 @@ function readInput(t){
 const S={x:START.x,z:START.z,y:0,vy:0,h:START.h,vx:0,vz:0,yaw:0,air:false,slip:0,spd:0,pitch:0,roll:0,airT:0};
 S.y=H(S.x,S.z);
 const _n=new T.Vector3(),_up=new T.Vector3(0,1,0);
-function resetCar(){S.x=START.x;S.z=START.z;S.y=H(S.x,S.z);S.vx=S.vz=S.vy=0;S.yaw=0;S.h=START.h;S.air=false;}
+function resetCar(){if(KS.st!=='off')ksClear();S.x=START.x;S.z=START.z;S.y=H(S.x,S.z);S.vx=S.vz=S.vy=0;S.yaw=0;S.h=START.h;S.air=false;}
 document.getElementById('reset').addEventListener('click',resetCar);
 function collideCar(){
   const fx=Math.sin(S.h),fz=Math.cos(S.h);
@@ -1966,6 +1994,7 @@ function updateVisual(dt){
       camera.lookAt(_p.copy(tl).lerp(camState.look,e));
       if(k>=1){game.mode='play';document.body.classList.remove('title','intro');dropHQ();pixelRatio=PLAY_PR;renderer.setPixelRatio(pixelRatio);resize();}}
   }
+  if(!PH.on&&game.mode==='play')kashtaCam(dt);
   if(PH.on)photoCam(dt);
   skyDome.position.copy(camera.position);
   // sun + shadow box follow car
@@ -2315,9 +2344,81 @@ function stepCritters(dt){if(!CRIT.ready)return;const carSp=Math.hypot(S.vx,S.vz
       const q2=sn.hist[Math.min(sn.hist.length-1,i*2+2)];_cq.setFromAxisAngle(_up,Math.atan2(p[0]-q2[0],p[1]-q2[1]));
       _cp.set(p[0],H(p[0],p[1])+r0*0.8,p[1]);_cs.set(r0*(i===0?1.2:1),r0*0.7,r0*(i===0?1.6:1.5));sn.m.setMatrixAt(i,_cm.compose(_cp,_cq,_cs));}
     sn.m.instanceMatrix.needsUpdate=true;}}
+/* ---------------- kashta (كشتة): the driver steps out, lays a rug, lights a fire and sets out the camp kit, anywhere ---------------- */
+const KS={st:'off',t:0,spd:1,items:[],grp:null,man:null,light:null,camW:0,ca:0,x:0,y:0,z:0};
+const KS_END=4.6,_kq=new T.Vector3(),_kl=new T.Vector3(),_km=new T.Matrix4();
+const ksBtn=document.getElementById('ksBtn');
+function ksBlocked(x,z,r){if(waterY(x,z)>H(x,z)-0.05)return true;
+  for(const c of staticC)if(Math.hypot(x-c.x,z-c.z)<c.r+r)return true;
+  for(const b of staticB){const dx=x-b.x,dz=z-b.z;if(Math.abs(dx)>b.hx+b.hz+r||Math.abs(dz)>b.hx+b.hz+r)continue;const lx=dx*b.c-dz*b.s,lz=dx*b.s+dz*b.c;if(Math.abs(lx)<b.hx+r&&Math.abs(lz)<b.hz+r)return true;}
+  return false;}
+function ksInst(id,over){const b=getBuilt(id,over),g=AA.three.instance(b);return {g,b};}
+function ksBuild(){
+  const fx=Math.sin(S.h),fz=Math.cos(S.h);let side=0;
+  for(const sd of [1,-1]){const ux=-Math.cos(S.h)*sd,uz=Math.sin(S.h)*sd,cx=S.x+ux*4.3,cz=S.z+uz*4.3;   // driver side (left) first, then the right
+    if(!ksBlocked(cx,cz,1.7)&&!ksBlocked(cx+ux*1.9,cz+uz*1.9,0.6)){side=sd;break;}}
+  if(!side)return false;
+  const ux=-Math.cos(S.h)*side,uz=Math.sin(S.h)*side,cx=S.x+ux*4.3,cz=S.z+uz*4.3,hc=H(cx,cz);
+  const su=(H(cx+ux*1.2,cz+uz*1.2)-H(cx-ux*1.2,cz-uz*1.2))/2.4,sv=(H(cx+fx*1.6,cz+fz*1.6)-H(cx-fx*1.6,cz-fz*1.6))/3.2;
+  const W=(u,v)=>[cx+ux*u+fx*v,cz+uz*u+fz*v],plane=(u,v)=>hc+su*u+sv*v,yawU=Math.atan2(ux,uz),yawV=Math.atan2(fx,fz);
+  const root=new T.Group();scene.add(root);
+  // the rug and what sits on it ride a pad tilted to the ground (local x points back at the car, z forward)
+  const pad=new T.Group();root.add(pad);pad.position.set(cx,hc+0.025,cz);
+  const X=new T.Vector3(-ux,-su,-uz).normalize(),Z=new T.Vector3(fx,sv,fz).normalize(),Y=new T.Vector3().crossVectors(Z,X).normalize();Z.crossVectors(X,Y);
+  pad.quaternion.setFromRotationMatrix(_km.makeBasis(X,Y,Z));
+  const items=[];
+  const add=(id,over,parent,pos,ry,t0,kind)=>{const {g,b}=ksInst(id,over);g.position.set(pos[0],pos[1],pos[2]);g.rotation.y=ry;g.scale.setScalar(0.001);g.visible=false;parent.add(g);
+    const it={g,b,t0,kind:kind||'pop'};items.push(it);return it;};
+  const onSand=(u,v,dy)=>{const p=W(u,v);return [p[0],H(p[0],p[1])+(dy||0),p[1]];};
+  add('carpet',{length:3.1,width:2.2,seed:31},pad,[0,0,0],-PI/2,0.35,'unroll');
+  add('ks_box',{},root,onSand(-0.55,2.05),yawV+PI/2,1.15);
+  add('firewood',{length:0.8,rows:2},root,onSand(1.85,-1.45),yawV+0.4,1.5);
+  const fire=add('fire_pit',{radius:0.4,dallahs:false,flame:1.45},root,onSand(1.95,0.05),0,1.85);
+  add('dallah',{size:1.05},root,onSand(1.55,0.55),yawU+PI,2.45);
+  add('ks_teapot',{},root,onSand(1.62,-0.45),yawU+2.2,2.7);
+  add('coffee_set',{dallahs:1,cups:4,dates:true},pad,[-0.45,0.012,0.25],-PI/2,3.0);
+  add('ks_markaa',{},pad,[0.82,0,-0.5],PI/2,3.3);add('ks_markaa',{},pad,[0.82,0,0.5],PI/2,3.55);
+  // the driver: a young Najdi man in thobe and shemagh
+  const m=ksInst('shaib',{seed:121,stoop:0,beard:0.45,grey:0,bisht:'none'});m.g.children.forEach(o=>{if(o.name==='wood')o.visible=false;});root.add(m.g);   // no canem.g.visible=false;
+  const door=W(-3.1,0.35),seat=W(-0.4,-0.5);
+  Object.assign(KS,{grp:root,items,fire,man:m.g,door,seat,yawU,x:cx,z:cz,y:hc,plane,clip:null});
+  if(fire.b.meta&&fire.b.meta.light)KS.light={g:fire.g,L:fire.b.meta.light,ph:1.3};
+  return true;}
+function ksClear(){if(KS.grp){scene.remove(KS.grp);}if(KS.light){const i=lightSrc.indexOf(KS.light);if(i>=0)lightSrc.splice(i,1);env.near=null;envU._t=0;}
+  Object.assign(KS,{st:'off',t:0,grp:null,items:[],man:null,light:null});ksBtn.classList.remove('on');ksBtn.setAttribute('aria-pressed','false');}
+function ksStart(){if(KS.st!=='off'||game.mode!=='play'||PH.on)return;KS.st='stop';ksBtn.classList.add('on');ksBtn.setAttribute('aria-pressed','true');}
+function ksLeave(fast){if(KS.st==='stop'){ksClear();return;}if(KS.st==='out'||KS.st==='camp'){KS.st='pack';KS.spd=fast?3.2:2;}}
+ksBtn.addEventListener('click',()=>{if(KS.st==='off')ksStart();else ksLeave(false);});
+const ksE=(t)=>{t=Math.min(1,Math.max(0,t));const c=1.70158;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2);};   // ease-out-back pop
+function ksPlay(c,fade){if(KS.clip===c)return;KS.clip=c;AA.three.play(KS.man,c,fade==null?0.2:fade);}
+function stepKashta(dt){
+  if(KS.st==='off'){KS.camW=Math.max(0,KS.camW-dt*0.9);return;}
+  if(KS.st==='stop'){if(Math.hypot(S.vx,S.vz)<0.6&&!S.air){if(!AAok||!ksBuild()){showToast('المكان ما يناسب الكشتة، جرّب مكان ثاني',2.5);ksClear();return;}
+      KS.st='out';KS.t=0;KS.ca=Math.atan2(camState.pos.x-KS.x,camState.pos.z-KS.z);}else return;}
+  if(KS.st==='out'){KS.t+=dt;if(KS.t>=KS_END){KS.t=KS_END;KS.st='camp';}}
+  else if(KS.st==='pack'){KS.t-=dt*KS.spd;if(KS.t<=0){ksClear();return;}}
+  const t=KS.t;KS.camW=Math.min(1,KS.camW+dt*(KS.st==='pack'?-0.8:0.7));KS.ca+=dt*0.045;
+  for(const it of KS.items){let k;
+    if(it.kind==='unroll'){k=Math.min(1,Math.max(0,(t-it.t0)/0.8));it.g.visible=k>0;const e=k*k*(3-2*k);it.g.scale.set(Math.max(0.001,e),1,1);it.g.position.z=(1-e)*1.4;}
+    else{k=(t-it.t0)/0.4;it.g.visible=k>0;it.g.scale.setScalar(Math.max(0.001,ksE(k)));}}
+  // fire grows in, then its light joins the nearby light pool
+  const fk=Math.min(1,Math.max(0,(t-2.0)/1.2));if(KS.light){KS.light.L=Object.assign({},KS.fire.b.meta.light,{intensity:KS.fire.b.meta.light.intensity*fk});
+    const i=lightSrc.indexOf(KS.light);if(fk>0.02&&i<0){lightSrc.push(KS.light);envU._t=0;}else if(fk<=0.02&&i>=0)lightSrc.splice(i,1);}
+  // the man: walks from the driver door to the rug, stands placing the kit, then sits facing the fire
+  const g=KS.man,wk=Math.min(1,t/1.9);g.visible=t>0.05;
+  const px=KS.door[0]+(KS.seat[0]-KS.door[0])*wk,pz=KS.door[1]+(KS.seat[1]-KS.door[1])*wk,walking=t<1.9;
+  const onRug=Math.min(1,Math.max(0,(wk-0.55)/0.45));
+  g.position.set(px,H(px,pz)*(1-onRug)+(KS.y+0.03+(KS.plane(-0.4,-0.5)-KS.y))*onRug,pz);
+  if(walking){const want=KS.st==='pack'?Math.atan2(KS.door[0]-KS.seat[0],KS.door[1]-KS.seat[1]):Math.atan2(KS.seat[0]-KS.door[0],KS.seat[1]-KS.door[1]);g.rotation.y=want;ksPlay('walk');}
+  else{let dh=KS.yawU-g.rotation.y;dh=Math.atan2(Math.sin(dh),Math.cos(dh));g.rotation.y+=dh*Math.min(1,dt*5);ksPlay(t>4.1?'sit_floor':'idle',0.35);}
+  if(g.userData.anim)g.userData.anim.mixer.update(dt*(walking?1.45:1));}
+function kashtaCam(dt){if(KS.camW<=0.001||!KS.grp)return;const w=KS.camW*KS.camW*(3-2*KS.camW);
+  const lx=KS.x+(S.x-KS.x)*0.3,lz=KS.z+(S.z-KS.z)*0.3;
+  _kq.set(KS.x+Math.sin(KS.ca)*8.2,KS.y+4.2,KS.z+Math.cos(KS.ca)*8.2);const gy=H(_kq.x,_kq.z)+1.6;if(_kq.y<gy)_kq.y=gy;
+  _kl.copy(camState.look).lerp(_p.set(lx,KS.y+0.6,lz),w);camera.position.lerp(_kq,w);camera.lookAt(_kl);}
 function worldTick(dt,now){
   if(!CRIT.ready&&AAok&&queue.length===0)initCritters();
-  stepCritters(dt);
+  stepCritters(dt);stepKashta(dt);
   wT+=dt;game.clock+=dt;
   updateChunks(S.x,S.z,1);recenterTrail(S.x,S.z);
   soundTick(dt);envTick(dt);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}
@@ -2349,7 +2450,7 @@ function frame(now){
 }
 // test hook: advance simulation deterministically without rAF timing
 window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){if(frozen()){updateVisual(DT);continue;}readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
-window.__world={CRIT,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
+window.__world={CRIT,KS,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
 window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
 })();
