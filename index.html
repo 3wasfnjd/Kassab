@@ -88,7 +88,8 @@ body.title #menuBtn,body.photo #menuBtn{display:none!important}
 #ftIn{position:fixed;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(124px + env(safe-area-inset-bottom,0px));height:46px;padding:0 22px;border-radius:23px;
   border:1.5px solid #ffb35c;background:rgba(58,40,22,.78);color:#ffb35c;font:800 17px var(--font);touch-action:manipulation}
 #ftRun.on{background:var(--glass-hi);border-color:#ffb35c;color:#ffb35c}
-body.foot .pads,body.foot #steer,body.foot #awd,body.foot .hud,body.foot #ksBtn,body.foot #camBtn{display:none!important}
+body.foot .pads,body.foot #steer,body.foot #awd,body.foot .hud,body.foot #ksBtn{display:none!important}
+body.photo #footUI,body.photo #footBtn{display:none!important}
 #photoUI{position:fixed;inset:0;display:none;pointer-events:none;z-index:20;font:700 13px var(--font);color:#fff}
 body.photo #photoUI{display:block}
 body.photo .hud,body.photo #map,body.photo .pads,body.photo #steer,body.photo #wx,body.photo #reset,body.photo #radio,body.photo #wxBtn,body.photo #wxPanel,body.photo #camBtn,body.photo #ksBtn,body.photo #footBtn,body.photo #rot,body.photo #toast,body.photo #vig,body.photo .brand{display:none!important}
@@ -1772,36 +1773,37 @@ const drone=(()=>{const g=new T.Group(),dk=new T.MeshStandardMaterial({color:0x2
     const pr=new T.Mesh(new T.CylinderGeometry(0.11,0.11,0.006,14),new T.MeshBasicMaterial({color:0x111111,transparent:true,opacity:0.45}));pr.position.set(sx*0.22,0.05,sz*0.22);g.add(pr);g.userData.props.push(pr);
     const led=new T.Mesh(new T.SphereGeometry(0.018,6,4),new T.MeshBasicMaterial({color:sz>0?0x33ff66:0xff3322}));led.position.set(sx*0.22,-0.02,sz*0.22);g.add(led);});
   g.scale.setScalar(2.2);g.visible=false;scene.add(g);return g;})();
+function phSub(){return FOOT.st==='on'?{x:FOOT.x,y:FOOT.y,z:FOOT.z,h:FOOT.h,lf:0.55,lh:1.25}:{x:SB.x,y:SB.y,z:SB.z,h:SB.h,lf:2.4,lh:1.45};}   // what the drone films: the car, or the driver on foot
 function photoCam(dt){
-  const fx=Math.sin(S.h),fz=Math.cos(S.h);
+  const SB=phSub(),fx=Math.sin(SB.h),fz=Math.cos(SB.h);
   if(PH.land>0){   // fly back to the bonnet, then hand the camera back to the game
-    PH.land-=dt;const k=Math.min(1,dt*3.2),hx=S.x+fx*2.4,hz=S.z+fz*2.4,hy=S.y+1.45;PH.x+=(hx-PH.x)*k;PH.y+=(hy-PH.y)*k;PH.z+=(hz-PH.z)*k;
-    drone.visible=true;drone.position.set(PH.x,PH.y,PH.z);drone.rotation.y=S.h;spinProps(dt);
-    camera.position.copy(camState.pos);camera.lookAt(camState.look);
+    PH.land-=dt;const k=Math.min(1,dt*3.2),hx=SB.x+fx*SB.lf,hz=SB.z+fz*SB.lf,hy=SB.y+SB.lh;PH.x+=(hx-PH.x)*k;PH.y+=(hy-PH.y)*k;PH.z+=(hz-PH.z)*k;
+    drone.visible=true;drone.position.set(PH.x,PH.y,PH.z);drone.rotation.y=SB.h;spinProps(dt);
+    if(FOOT.st==='on'){FOOT.camW=1;footCam(dt);}else{camera.position.copy(camState.pos);camera.lookAt(camState.look);}
     if(PH.land<=0){drone.visible=false;PH.on=false;PH.freeze=true;document.body.classList.remove('photo');resize();}return;}
   if(PH.mode==='drone'){
     if(PH.take<1){PH.take=Math.min(1,PH.take+dt/1.6);const e=PH.take*PH.take*(3-2*PH.take);   // lift off the bonnet, rise and back away to look at the car
-      const sx=S.x+fx*2.4,sz=S.z+fz*2.4,sy=S.y+1.45,ex=S.x+fx*9,ez=S.z+fz*9,ey=S.y+5.5;
-      PH.x=sx+(ex-sx)*e;PH.z=sz+(ez-sz)*e;PH.y=sy+(ey-sy)*e+Math.sin(e*Math.PI)*0.8;PH.yaw=S.h+Math.PI;PH.pitch=-0.35*e;
-      drone.visible=true;drone.position.set(PH.x,PH.y,PH.z);drone.rotation.y=S.h;spinProps(dt);
+      const sx=SB.x+fx*SB.lf,sz=SB.z+fz*SB.lf,sy=SB.y+SB.lh,ex=SB.x+fx*9,ez=SB.z+fz*9,ey=SB.y+5.5;
+      PH.x=sx+(ex-sx)*e;PH.z=sz+(ez-sz)*e;PH.y=sy+(ey-sy)*e+Math.sin(e*Math.PI)*0.8;PH.yaw=SB.h+Math.PI;PH.pitch=-0.35*e;
+      drone.visible=true;drone.position.set(PH.x,PH.y,PH.z);drone.rotation.y=SB.h;spinProps(dt);
       // watch the take-off from behind the car until the drone is up
-      const k=Math.min(1,PH.take*1.25);camera.position.lerpVectors(camState.pos,_p.set(PH.x,PH.y,PH.z),k*k);
+      const k=Math.min(1,PH.take*1.25);camera.position.lerpVectors(PH.cam0||camState.pos,_p.set(PH.x,PH.y,PH.z),k*k);
       if(k<1)camera.lookAt(_tl.set(PH.x,PH.y,PH.z));else setDroneView();return;}
     drone.visible=false;
     const sp=10*dt,cy=Math.cos(PH.yaw),sy=Math.sin(PH.yaw);
     PH.x+=(sy*-PH.stick.y+cy*PH.stick.x)*sp;PH.z+=(cy*-PH.stick.y-sy*PH.stick.x)*sp;PH.y+=PH.alt*5*dt;
-    const dx=PH.x-S.x,dz=PH.z-S.z,d=Math.hypot(dx,dz);if(d>170){PH.x=S.x+dx/d*170;PH.z=S.z+dz/d*170;}   // stay where the world is loaded
-    PH.y=Math.max(H(PH.x,PH.z)+0.7,Math.min(S.y+120,PH.y));setDroneView();}
+    const dx=PH.x-SB.x,dz=PH.z-SB.z,d=Math.hypot(dx,dz);if(d>170){PH.x=SB.x+dx/d*170;PH.z=SB.z+dz/d*170;}   // stay where the world is loaded
+    PH.y=Math.max(H(PH.x,PH.z)+0.7,Math.min(SB.y+120,PH.y));setDroneView();}
   else{const o=PH.orb;o.a-=PH.stick.x*1.4*dt;o.el=Math.max(0.03,Math.min(1.45,o.el-PH.stick.y*0.9*dt));o.r=Math.max(3.5,Math.min(45,o.r*(1-PH.alt*1.2*dt)));
-    const ce=Math.cos(o.el);camera.position.set(S.x+Math.sin(o.a)*ce*o.r,Math.max(H(S.x,S.z)+0.4,S.y+1+Math.sin(o.el)*o.r),S.z+Math.cos(o.a)*ce*o.r);camera.lookAt(_tl.set(S.x,S.y+1,S.z));drone.visible=false;}}
+    const ce=Math.cos(o.el);camera.position.set(SB.x+Math.sin(o.a)*ce*o.r,Math.max(H(SB.x,SB.z)+0.4,SB.y+1+Math.sin(o.el)*o.r),SB.z+Math.cos(o.a)*ce*o.r);camera.lookAt(_tl.set(SB.x,SB.y+1,SB.z));drone.visible=false;}}
 function setDroneView(){camera.position.set(PH.x,PH.y,PH.z);camera.lookAt(_tl.set(PH.x+Math.sin(PH.yaw)*Math.cos(PH.pitch),PH.y+Math.sin(PH.pitch),PH.z+Math.cos(PH.yaw)*Math.cos(PH.pitch)));}
 function spinProps(dt){drone.userData.props.forEach((p,i)=>p.rotation.y+=dt*(i%2?-60:60));}
 function setFreeze(v){PH.freeze=v;const b=document.getElementById('phFreeze');if(b){b.classList.toggle('on',v);b.textContent=v?'⏸ تجميد':'▶ متحرك';}
   if(snd.out&&snd.ctx)snd.out.gain.setTargetAtTime(v&&PH.on?0.12:0.9,snd.ctx.currentTime,0.15);}
 function frozen(){return PH.on&&PH.freeze;}
-function enterPhoto(){if(PH.on||game.mode!=='play')return;PH.on=true;setFreeze(true);PH.take=0;PH.land=0;PH.mode='drone';PH.orb.a=Math.atan2(camState.pos.x-S.x,camState.pos.z-S.z);
+function enterPhoto(){if(PH.on||game.mode!=='play')return;PH.on=true;setFreeze(true);PH.take=0;PH.land=0;PH.mode='drone';{const sb=phSub();PH.cam0=camera.position.clone();PH.orb.a=Math.atan2(camera.position.x-sb.x,camera.position.z-sb.z);}
   document.body.classList.add('photo');document.querySelectorAll('#phTop button').forEach(b=>b.classList.toggle('on',b.dataset.m==='drone'));camera.fov=innerHeight>innerWidth?66:50;camera.updateProjectionMatrix();}
-function exitPhoto(){if(!PH.on||PH.land>0)return;if(PH.rec)stopRec();setFreeze(false);PH.freeze=false;if(PH.mode==='drone'&&PH.take>=1){PH.land=1.1;camera.position.copy(camState.pos);}else{drone.visible=false;PH.on=false;PH.freeze=true;document.body.classList.remove('photo');resize();}}
+function exitPhoto(){if(!PH.on||PH.land>0)return;if(PH.rec)stopRec();setFreeze(false);PH.freeze=false;if(PH.mode==='drone'&&PH.take>=1){PH.land=1.1;if(FOOT.st!=='on')camera.position.copy(camState.pos);}else{drone.visible=false;PH.on=false;PH.freeze=true;document.body.classList.remove('photo');resize();}}
 function readInput(t){
   if(game.mode!=='play'&&!window.__autopilot){input.steer=0;input.gas=0;input.brake=0;input.hand=false;return;}
   if(PH.on){input.steer=0;input.gas=0;input.brake=(S.vF||0)>0.5?1:0;input.hand=false;return;}   // photo mode: the car brakes to a stop (never reverses)
