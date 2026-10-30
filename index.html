@@ -66,7 +66,10 @@ body.uihide .pads,body.uihide #knobBase,body.uihide #awd,body.uihide #ftStick,bo
 #carPick button{font:800 15px var(--font);padding:6px 16px;border-radius:12px;border:1.5px solid rgba(60,36,14,.35);background:rgba(255,248,232,.7);color:#2a2118}
 #carPick button.on{background:#2a2118;color:#f2c27a;border-color:#2a2118}
 #nick{display:block;margin:0 auto 12px;width:min(240px,70vw);font:700 16px var(--font);text-align:center;padding:8px 12px;border-radius:12px;border:1.5px solid rgba(60,36,14,.35);background:rgba(255,248,232,.85);color:#2a2118}
-#netn{font-weight:800}
+#netn{display:none}
+#netCount{position:fixed;top:calc(212px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:48px;text-align:center;font:800 11px var(--font);color:#fff;background:rgba(40,26,12,.55);border-radius:9px;padding:3px 0;display:none;direction:rtl;line-height:1.25}
+body.online #netCount{display:block}body.title #netCount,body.photo #netCount{display:none!important}body.uihide #netCount{opacity:0}
+#netCount i{display:block;font-style:normal;font-size:15px;color:#7fe08a}
 #chatBtn{position:fixed;top:calc(76px + env(safe-area-inset-top,0px));right:calc(246px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;place-items:center;padding:0;z-index:6;display:none}
 body.menuopen.online #chatBtn{display:grid;animation:mnIn .18s ease-out both}
@@ -256,6 +259,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <div id="radPanel" hidden><div class="rt">الكينود <span id="radState">مقفل</span></div><div id="radCh"></div><div class="rn">اضغط مطوّل على زر الكينود وتكلم — كل قناة يتكلم فيها واحد بس</div></div>
 <button id="pttBtn" aria-label="اضغط وتكلم"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="15" rx="2"/><path d="M10 7V2M10 12h4M10 15.5h4"/></svg></span><b id="pttCh">١</b></button>
 <div id="rxLbl"></div>
+<div id="netCount" aria-label="عدد اللاعبين"></div>
 <div id="chatLog" aria-live="polite"></div>
 <div id="chatBar" hidden><input id="chatIn" maxlength="120" placeholder="اكتب رسالة…" dir="auto" autocomplete="off" enterkeyhint="send"><button id="chatSend">إرسال</button><button id="chatMute" aria-label="إخفاء رسائل الناس">🔕</button><button id="chatX" aria-label="إغلاق">✕</button></div>
 <div id="photoUI" aria-label="وضع التصوير">
@@ -1884,6 +1888,8 @@ function collideCar(){
     for(const c of staticC){const dx=cx-c.x,dz=cz-c.z,d=Math.hypot(dx,dz),m=cr+c.r;
       if(d<m&&d>1e-4){const nx=dx/d,nz=dz/d,pen=m-d;S.x+=nx*pen;S.z+=nz*pen;cx+=nx*pen;cz+=nz*pen;
         const vn=S.vx*nx+S.vz*nz;if(vn<0){S.vx-=1.35*vn*nx;S.vz-=1.35*vn*nz;S.vx*=0.85;S.vz*=0.85;if(-vn>4)puff(c.x,c.z,6,2);}}}
+    for(const c of NET.obs){const dx=cx-c.x,dz=cz-c.z;if(Math.abs(dx)>5||Math.abs(dz)>5)continue;const d=Math.hypot(dx,dz),m=cr+c.r;   // other players' cars and people
+      if(d<m&&d>1e-4){const nx=dx/d,nz=dz/d,pen=m-d;S.x+=nx*pen;S.z+=nz*pen;cx+=nx*pen;cz+=nz*pen;const vn=S.vx*nx+S.vz*nz;if(vn<0){S.vx-=1.5*vn*nx;S.vz-=1.5*vn*nz;S.vx*=0.8;S.vz*=0.8;if(-vn>4&&c.car){puff(cx-nx*cr,cz-nz*cr,8,2);showToast('💥',0.6);}}}}
     for(const b of staticB){const rx0=cx-b.x,rz0=cz-b.z;if(Math.abs(rx0)>b.hx+b.hz+cr||Math.abs(rz0)>b.hx+b.hz+cr)continue;
       const lx=rx0*b.c-rz0*b.s,lz=rx0*b.s+rz0*b.c;
       const qx=Math.max(-b.hx,Math.min(lx,b.hx)),qz=Math.max(-b.hz,Math.min(lz,b.hz));
@@ -2625,6 +2631,7 @@ function footCollide(){const r=0.32;
     if(d<1e-4){const ex=b.hx-Math.abs(lx),ez=b.hz-Math.abs(lz);if(ex<ez){dx=Math.sign(lx)||1;dz=0;d=-ex;}else{dz=Math.sign(lz)||1;dx=0;d=-ez;}}else{dx/=d;dz/=d;}
     if(d<r){const nx=dx*b.c+dz*b.s,nz=-dx*b.s+dz*b.c;FOOT.x+=nx*(r-d);FOOT.z+=nz*(r-d);}}
   for(const list of [colliders,actorC])for(const c of list){const dx=FOOT.x-c.x,dz=FOOT.z-c.z;if(Math.abs(dx)>3||Math.abs(dz)>3)continue;const d=Math.hypot(dx,dz),m=c.r+r;if(d<m&&d>1e-4){FOOT.x+=dx/d*(m-d);FOOT.z+=dz/d*(m-d);}}
+  for(const c of NET.obs){const dx=FOOT.x-c.x,dz=FOOT.z-c.z;if(Math.abs(dx)>4||Math.abs(dz)>4)continue;const d=Math.hypot(dx,dz),m=c.r+r;if(d<m&&d>1e-4){FOOT.x+=dx/d*(m-d);FOOT.z+=dz/d*(m-d);}}
   const fx=Math.sin(S.h),fz=Math.cos(S.h);   // the parked car: two circles along its length
   for(const off of [1.5,0,-1.5]){const cx=S.x+fx*off,cz=S.z+fz*off,dx=FOOT.x-cx,dz=FOOT.z-cz,d=Math.hypot(dx,dz),m=1.05+r;if(d<m&&d>1e-4){FOOT.x+=dx/d*(m-d);FOOT.z+=dz/d*(m-d);}}}
 function footOut(){if(FOOT.st!=='off'||game.mode!=='play'||PH.on)return;
@@ -2704,7 +2711,7 @@ function footCam(dt){heroTagStep();if(FOOT.camW<=0.001||!FOOT.g)return;const w=F
   const rb=$('ftRun');rb.addEventListener('pointerdown',e=>{FOOT.run=true;rb.classList.add('on');rb.setPointerCapture(e.pointerId);e.preventDefault();});
   const rup=()=>{FOOT.run=false;rb.classList.remove('on');};rb.addEventListener('pointerup',rup);rb.addEventListener('pointercancel',rup);}
 /* ---------------- online: one public world (Cloudflare Durable Object shards); cars, walking, horn and chat ---------------- */
-const NET={ws:null,url:null,id:null,peers:new Map(),shard:1,sendT:0,idleT:0,last:null,name:'',retry:0,muted:false,pingT:0,n:0};
+const NET={obs:[],ws:null,url:null,id:null,peers:new Map(),shard:1,sendT:0,idleT:0,last:null,name:'',retry:0,muted:false,pingT:0,n:0};
 const AR_N=n=>Number(n).toLocaleString('ar-SA');
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
@@ -2717,12 +2724,17 @@ function netConnect(){
   ws.onopen=()=>{opened=true;NET.ws=ws;NET.retry=0;ws.send(JSON.stringify({t:'hi',name:NET.name,car:CARSEL}));};
   ws.binaryType='arraybuffer';
   ws.onmessage=e=>{if(e.data instanceof ArrayBuffer){radPlay(e.data);return;}if(e.data==='pong')return;let m;try{m=JSON.parse(e.data);}catch(er){return;}netMsg(m);};
-  ws.onclose=()=>{if(NET.ws===ws)NET.ws=null;netClearPeers();document.body.classList.remove('online');netBadge();
+  ws.onclose=()=>{if(NET.ws===ws)NET.ws=null;if(NET.paused)return;netClearPeers();document.body.classList.remove('online');netBadge();
     if(!opened&&NET.shard<12){NET.shard++;setTimeout(netConnect,300);return;}   // shard full or unreachable: try the next one
-    NET.shard=1;NET.retry++;setTimeout(netConnect,Math.min(30000,2000*Math.pow(2,Math.min(4,NET.retry))));};
+    if(NET.paused)return;NET.shard=1;NET.retry++;setTimeout(netConnect,Math.min(30000,2000*Math.pow(2,Math.min(4,NET.retry))));};
   ws.onerror=()=>{};}
+function netPause(){NET.paused=true;if(NET.ws){try{NET.ws.close();}catch(e){}NET.ws=null;}netClearPeers();document.body.classList.remove('online');netBadge();}
+function netResume(){if(!NET.paused)return;NET.paused=false;if(NET.url&&!NET.ws){NET.shard=1;NET.retry=0;netConnect();}}
+document.addEventListener('visibilitychange',()=>{if(!NET.url)return;if(document.hidden)netPause();else netResume();});
+addEventListener('pagehide',()=>{if(NET.ws)try{NET.ws.close();}catch(e){}});
+setInterval(()=>{if(NET.ws&&NET.ws.readyState===1)NET.ws.send('ping');},3000);   // keep-alive the server answers by itself (free); 8 s of silence means gone
 function netSend(o){if(NET.ws&&NET.ws.readyState===1)NET.ws.send(typeof o==='string'?o:JSON.stringify(o));}
-function netBadge(){const el=document.getElementById('netn');if(!el)return;el.textContent=NET.ws&&NET.id?' · أونلاين '+AR_N(NET.peers.size+1):'';}
+function netBadge(){const el=document.getElementById('netCount');if(!el)return;el.innerHTML=NET.ws&&NET.id?'<i>'+AR_N(NET.peers.size+1)+'</i>أونلاين':'';}
 function netMsg(m){
   if(m.t==='welcome'){NET.id=m.i;document.body.classList.add('online');{const c=+(lsGet('kassab_ch')||0);if(c)radSetCh(c);}(m.players||[]).forEach(p=>{const pr=netPeer(p.i,p.n);pr.carId=p.c;if(p.d)netPush(pr,p.d);});netBadge();showToast('دخلت الأونلاين — '+AR_N(NET.peers.size+1)+' بالعالم',2.2);}
   else if(m.t==='join'){netPeer(m.i,m.n).carId=m.c;netBadge();chatLine(null,m.n+' دخل العالم');}
@@ -2757,13 +2769,14 @@ const _np=new T.Vector3();
 function stepNet(dt){
   if(!NET.ws||!NET.id){return;}
   // send our state: 8 times a second while something moves, every 2 s when still
-  NET.sendT-=dt;NET.pingT-=dt;
+  const rt=performance.now()/1000,rdt=Math.min(1,rt-(NET.rt||rt));NET.rt=rt;NET.sendT-=rdt;NET.pingT-=rdt;
   const ft=FOOT.st==='on',ks=(KS.st==='out'||KS.st==='camp')?KS.side:0,d=[S.x,S.z,S.h,Math.hypot(S.vx,S.vz),ft?(FOOT.sit?2:1):0,ft?FOOT.x:0,ft?FOOT.z:0,ft?FOOT.h:0,ft?FOOT.sp:0,ks];
   const moved=!NET.last||Math.abs(d[0]-NET.last[0])+Math.abs(d[1]-NET.last[1])+Math.abs(d[2]-NET.last[2])*3+Math.abs(d[5]-NET.last[5])+Math.abs(d[6]-NET.last[6])+Math.abs(d[4]-NET.last[4])+Math.abs(d[9]-NET.last[9])>0.03;
-  if(NET.sendT<=0&&(moved||NET.idleT<=0)){netSend({t:'s',d});NET.last=d;NET.sendT=0.125;NET.idleT=2;}else NET.idleT-=dt;
-  if(NET.pingT<=0){NET.pingT=25;netSend('ping');}
+  if(NET.sendT<=0&&(moved||NET.idleT<=0)){netSend({t:'s',d});NET.last=d;NET.sendT=0.125;NET.idleT=2;}else NET.idleT-=rdt;
   // draw the others ~180 ms in the past, between two received states
   const now=performance.now()/1000-0.18;
+  NET.obs.length=0;
+  {const t0=performance.now()/1000;NET.peers.forEach((p,id)=>{const lb=p.buf[p.buf.length-1];if(lb&&t0-lb.t>10){netDrop(p);NET.peers.delete(id);netBadge();}});}
   NET.peers.forEach(p=>{const b=p.buf;if(!b.length)return;let a=b[0],c=b[b.length-1],k=1;
     for(let i=0;i<b.length-1;i++)if(b[i].t<=now&&b[i+1].t>=now){a=b[i];c=b[i+1];k=(now-a.t)/Math.max(1e-3,c.t-a.t);break;}
     if(now<b[0].t){a=c=b[0];k=0;}
@@ -2788,6 +2801,8 @@ function stepNet(dt){
         const an=p.man.userData.anim,cl=sp>2.6?'run':sp>0.15?'walk':heroIdle(heroKey(p.carId||'gmc'));if(an.name!==cl)AA.three.play(p.man,cl,0.2);if(an.current)an.current.timeScale=cl==='run'?sp/3.5:cl==='walk'?Math.max(0.5,sp/1.33):1;
         an.mixer.update(dt);tx=mx;tz=mz;ty=H(mx,mz)+2.25;}}
     else if(p.man&&p.man.visible)p.man.visible=false;
+    if(!far){const ox=Math.sin(h),oz=Math.cos(h);for(const o of [1.5,0,-1.5])NET.obs.push({x:x+ox*o,z:z+oz*o,r:1.05,car:1});
+      if(p.man&&p.man.visible)NET.obs.push({x:p.man.position.x,z:p.man.position.z,r:0.33});}
     p.tag.position.set(tx,ty,tz);p.tag.visible=!far;
     if(p.bub){p.bubbleT-=dt;p.bub.position.set(tx,ty+0.75,tz);p.bub.visible=!far;if(p.bubbleT<=0){scene.remove(p.bub);p.bub.material.map.dispose();p.bub.material.dispose();p.bub=null;}}});}
 /* ---------------- «الكينود»: push-to-talk walkie-talkie on channels 1-16 (8 kHz mu-law, radio-filtered) ---------------- */

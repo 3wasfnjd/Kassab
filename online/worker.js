@@ -1,6 +1,7 @@
 // Kassab online: one public world split into shards of up to MAX players. Each shard is a Durable Object
 // that relays player state and chat over WebSockets (hibernation API: idle shards cost nothing).
 const MAX = 24;
+const STALE = 8000, STALE_CHECK = 4000;   // a player who goes quiet for 8 s (phone locked, app killed, signal lost) is removed
 // strong words only (matched as whole words for the short ones) so normal chat like «زبون» or «حمار» in the badia is not starred out
 const BAD = ['منيوك','قحبه','قحبة','شرموط','شرموطه','طيز','fuck','shit','bitch','pussy','nigg'];
 const BAD_WORD = ['زب','كس','زق'];
@@ -39,10 +40,11 @@ export class World {
     const [client, server] = Object.values(new WebSocketPair());
     const id = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
     this.state.acceptWebSocket(server);
-    server.serializeAttachment({ id, name: '', car: 'gmc', d: null, chatT: 0, ch: 0, talk: 0 });
+    server.serializeAttachment({ id, name: '', car: 'gmc', d: null, chatT: 0, ch: 0, talk: 0, seen: Date.now() });
+    if (!(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now() + STALE_CHECK);
     return new Response(null, { status: 101, webSocket: client });
   }
-  others(ws) { return this.state.getWebSockets().filter(s => s !== ws); }
+  others(ws) { return this.state.getWebSockets().filter(s => s !== ws && !(s.deserializeAttachment() || {}).gone); }
   send(s, o) { try { s.send(typeof o === 'string' ? o : JSON.stringify(o)); } catch (e) {} }
   // «الكينود»: walkie-talkie channels 1-16. One speaker per channel at a time, 20 s per press;
   // voice arrives as small binary frames (8 kHz mu-law) and goes only to the same channel.
@@ -60,6 +62,7 @@ export class World {
     if (msg.length > 600) return;
     let m; try { m = JSON.parse(msg); } catch (e) { return; }
     const a = ws.deserializeAttachment() || {};
+    a.seen = Date.now();
     if (m.t === 'hi') {
       a.name = clean(m.name, 16) || ('كساب ' + a.id.slice(0, 3));
       a.car = /^[a-z0-9_]{1,16}$/.test(m.car || '') ? m.car : 'gmc';
@@ -73,7 +76,7 @@ export class World {
     if (!a.name) return;
     if (m.t === 's' && Array.isArray(m.d) && m.d.length <= 12) {
       const d = m.d.map(v => (typeof v === 'number' && isFinite(v)) ? Math.round(v * 100) / 100 : 0);
-      a.d = d; ws.serializeAttachment(a);   // newcomers get the latest position
+      a.d = d; a.seen = Date.now(); ws.serializeAttachment(a);   // newcomers get the latest position
       const out = JSON.stringify({ t: 's', i: a.id, d });
       for (const s of this.others(ws)) this.send(s, out);
       return;
@@ -101,7 +104,17 @@ export class World {
       return;
     }
   }
+  // every few seconds while anyone is connected: drop sockets that have gone silent
+  async alarm() {
+    const now = Date.now(), socks = this.state.getWebSockets();
+    for (const ws of socks) {
+      const a = ws.deserializeAttachment(); if (!a) continue;
+      let ping = 0; try { const t = this.state.getWebSocketAutoResponseTimestamp(ws); ping = t ? t.getTime() : 0; } catch (e) {}
+      if (now - Math.max(a.seen || 0, ping) > STALE) this.bye(ws);
+    }
+    if (this.state.getWebSockets().length) await this.state.storage.setAlarm(Date.now() + STALE_CHECK);
+  }
   webSocketClose(ws) { this.bye(ws); }
   webSocketError(ws) { this.bye(ws); }
-  bye(ws) { const a = ws.deserializeAttachment(); if (!a) return; this.stopTalk(ws, a); const out = JSON.stringify({ t: 'leave', i: a.id }); for (const s of this.others(ws)) this.send(s, out); try { ws.close(); } catch (e) {} }
+  bye(ws) { const a = ws.deserializeAttachment(); if (!a || a.gone) return; this.stopTalk(ws, a); a.gone = 1; try { ws.serializeAttachment(a); } catch (e) {} const out = JSON.stringify({ t: 'leave', i: a.id }); for (const s of this.others(ws)) this.send(s, out); try { ws.close(); } catch (e) {} }
 }
