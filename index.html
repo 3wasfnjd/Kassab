@@ -219,6 +219,28 @@ body.title:not(.intro) #load{display:flex}
 #start:focus-visible{outline:3px solid #fff;outline-offset:4px}
 body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #steer,body.title .pads,body.title #wx,body.title #rot,body.title #build,body.title #wxBtn,body.title #wxPanel,body.title #camBtn,body.title #ksBtn,body.title #footBtn,body.title #footUI{display:none!important}
 #err{position:fixed;inset:auto 16px 50% 16px;text-align:center;color:var(--ink);font-size:15px}
+/* short landscape screens (phones with the browser bar): the right-hand column does not fit above the pedals,
+   so the action buttons become one row along the top, and the menu opens a second row under it */
+@media (orientation:landscape) and (max-height:500px){
+  #wx{top:calc(10px + env(safe-area-inset-top,0px));right:auto;left:50%;transform:translateX(-50%)}
+  #menuBtn,#ksBtn,#footBtn,#pttBtn{top:calc(12px + env(safe-area-inset-top,0px));width:40px;height:40px}
+  #menuBtn{right:calc(84px + env(safe-area-inset-right,0px))}
+  #ksBtn{right:calc(130px + env(safe-area-inset-right,0px))}
+  #footBtn{right:calc(176px + env(safe-area-inset-right,0px))}
+  #pttBtn{right:calc(222px + env(safe-area-inset-right,0px))}
+  #netCount{top:calc(56px + env(safe-area-inset-top,0px));right:calc(170px + env(safe-area-inset-right,0px))}
+  body.online.radio #netCount{right:calc(170px + env(safe-area-inset-right,0px))}
+  #rxLbl{top:calc(58px + env(safe-area-inset-top,0px));right:calc(222px + env(safe-area-inset-right,0px))}
+  body.menuopen #reset,body.menuopen #radio,body.menuopen #wxBtn,body.menuopen #camBtn,body.menuopen.online #chatBtn,body.menuopen.online #radBtn{top:calc(60px + env(safe-area-inset-top,0px))}
+  body.menuopen #reset{right:calc(84px + env(safe-area-inset-right,0px))}body.menuopen #radio{right:calc(130px + env(safe-area-inset-right,0px))}
+  body.menuopen #wxBtn{right:calc(176px + env(safe-area-inset-right,0px))}body.menuopen #camBtn{right:calc(222px + env(safe-area-inset-right,0px))}
+  body.menuopen.online #chatBtn{right:calc(268px + env(safe-area-inset-right,0px))}body.menuopen.online #radBtn{right:calc(314px + env(safe-area-inset-right,0px))}
+  body.menuopen #netCount{display:none}
+  #radPanel{top:calc(108px + env(safe-area-inset-top,0px))}
+  #map{top:calc(106px + env(safe-area-inset-top,0px));width:92px;height:92px}
+  #chatLog{top:calc(44px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:min(320px,38vw)}
+  #toast{top:calc(108px + env(safe-area-inset-top,0px))}
+}
 </style>
 </head>
 <body class="title">
@@ -2741,6 +2763,7 @@ function netMsg(m){
   else if(m.t==='s'){const p=NET.peers.get(m.i)||netPeer(m.i,'…');netPush(p,m.d);}
   else if(m.t==='ptt'){if(m.ok&&!RAD.want){netSend({t:'ptt',on:false});return;}if(m.ok)radStartTx();else if(!m.ok){if(RAD.tx||RAD.want){radUp();showToast(m.why==='busy'?'القناة مشغولة — أحد يتكلم':'خلص وقت الكلام',1.6);}}}
   else if(m.t==='rx'){radRx(m.i,!!m.on);}
+  else if(m.t==='tow'){ptow(m);}
   else if(m.t==='horn'){const p=NET.peers.get(m.i);if(p&&p.cur){const d=Math.hypot(p.cur[0]-FOC.x,p.cur[1]-FOC.z);if(d<160)hornSound(Math.max(0.05,1-d/160));}}
   else if(m.t==='chat'){if(m.i===NET.id){chatLine(m.n,m.m,true);return;}if(NET.muted)return;chatLine(m.n,m.m);const p=NET.peers.get(m.i);if(p)peerBubble(p,m.m);}}
 // ---- peers
@@ -2759,7 +2782,10 @@ function peerBubble(p,text){if(p.bub){scene.remove(p.bub);p.bub.material.map.dis
 function netDrop(p){[p.car,p.tag,p.bub,p.man].forEach(o=>{if(o&&o.parent)o.parent.remove(o);});if(p.ks){ksDispose(p.ks);p.ks=null;}}
 function netClearPeers(){NET.peers.forEach(netDrop);NET.peers.clear();NET.id=null;}
 function netPush(p,d){p.buf.push({t:performance.now()/1000,d});if(p.buf.length>12)p.buf.shift();}
-function peerCarMesh(p){if(p.carMesh)return;let src=carModels.gmc;if(p.carId==='haval'){if(!carModels.haval){loadHaval().catch(()=>{});return;}src=carModels.haval;}if(!src)return;const m=src.clone();m.visible=true;p.car.add(m);p.carMesh=m;}
+function peerCarMesh(p){if(p.carMesh)return;let src=carModels.gmc;if(p.carId==='haval'){if(!carModels.haval){loadHaval().catch(()=>{});return;}src=carModels.haval;}if(!src)return;const m=src.clone();
+  // their lamps, placed from the model's own size like ours (useCar)
+  {const bb=src.userData.bb,k=src.userData.k,len=src.userData.len||CAR_LEN,H2=(bb.max.y-bb.min.y)*k,W2=(bb.max.x-bb.min.x)*k;
+    p.lamps=fitLamps(p.car,{x:W2*0.4,y:H2*0.58,z:-len/2-0.04},{x:W2*0.36,y:H2*0.53,z:len/2+0.05},1);p.lamps.rev.forEach(r=>r.visible=false);p.len=len;}m.visible=true;p.car.add(m);p.carMesh=m;}
 function cloneMan(key){const H0=HEROES[key||'thobe'];if(!H0||!H0.ok)return null;const src=H0.g;const ud=src.userData;src.userData={};const c=src.clone(true);src.userData=ud;
   const srcMesh=[],dstMesh=[],bones={};src.traverse(o=>{if(o.isSkinnedMesh)srcMesh.push(o);});c.traverse(o=>{if(o.isSkinnedMesh)dstMesh.push(o);if(o.isBone)bones[o.name]=o;});
   dstMesh.forEach((m,i)=>{const s=srcMesh[i];m.bind(new T.Skeleton(s.skeleton.bones.map(b=>bones[b.name]),s.skeleton.boneInverses),s.bindMatrix);});
@@ -2769,9 +2795,10 @@ function stepNet(dt){
   if(!NET.ws||!NET.id){return;}
   // send our state: 8 times a second while something moves, every 2 s when still
   const rt=performance.now()/1000,rdt=Math.min(1,rt-(NET.rt||rt));NET.rt=rt;NET.sendT-=rdt;NET.pingT-=rdt;
-  const ft=FOOT.st==='on',ks=(KS.st==='out'||KS.st==='camp')?KS.side:0,d=[S.x,S.z,S.h,Math.hypot(S.vx,S.vz),ft?(FOOT.sit?2:1):0,ft?FOOT.x:0,ft?FOOT.z:0,ft?FOOT.h:0,ft?FOOT.sp:0,ks];
-  const moved=!NET.last||Math.abs(d[0]-NET.last[0])+Math.abs(d[1]-NET.last[1])+Math.abs(d[2]-NET.last[2])*3+Math.abs(d[5]-NET.last[5])+Math.abs(d[6]-NET.last[6])+Math.abs(d[4]-NET.last[4])+Math.abs(d[9]-NET.last[9])>0.03;
+  const ft=FOOT.st==='on',ks=(KS.st==='out'||KS.st==='camp')?KS.side:0,d=[S.x,S.z,S.h,Math.hypot(S.vx,S.vz),ft?(FOOT.sit?2:1):0,ft?FOOT.x:0,ft?FOOT.z:0,ft?FOOT.h:0,ft?FOOT.sp:0,ks,((S.sink||0)>0.7&&Math.hypot(S.vx,S.vz)<1.2&&!ft)?1:0];
+  const moved=!NET.last||Math.abs(d[0]-NET.last[0])+Math.abs(d[1]-NET.last[1])+Math.abs(d[2]-NET.last[2])*3+Math.abs(d[5]-NET.last[5])+Math.abs(d[6]-NET.last[6])+Math.abs(d[4]-NET.last[4])+Math.abs(d[9]-NET.last[9])+Math.abs(d[10]-NET.last[10])>0.03;
   if(NET.sendT<=0&&(moved||NET.idleT<=0)){netSend({t:'s',d});NET.last=d;NET.sendT=0.125;NET.idleT=2;}else NET.idleT-=rdt;
+  stepPT(dt);
   // draw the others ~180 ms in the past, between two received states
   const now=performance.now()/1000-0.18;
   NET.obs.length=0;
@@ -2780,7 +2807,7 @@ function stepNet(dt){
     for(let i=0;i<b.length-1;i++)if(b[i].t<=now&&b[i+1].t>=now){a=b[i];c=b[i+1];k=(now-a.t)/Math.max(1e-3,c.t-a.t);break;}
     if(now<b[0].t){a=c=b[0];k=0;}
     const L=(i)=>a.d[i]+(c.d[i]-a.d[i])*k,LA=(i)=>{let dh=c.d[i]-a.d[i];dh=Math.atan2(Math.sin(dh),Math.cos(dh));return a.d[i]+dh*k;};
-    const x=L(0),z=L(1),h=LA(2);p.cur=[x,z];p.mode=c.d[4];
+    const x=L(0),z=L(1),h=LA(2);p.cur=[x,z];p.carH=h;p.mode=c.d[4];
     peerCarMesh(p);const far=Math.hypot(x-FOC.x,z-FOC.z)>300;p.car.visible=!far;
     const fx=Math.sin(h),fz=Math.cos(h),y=H(x,z);p.car.position.set(x,y,z);p.car.rotation.order='YXZ';p.car.rotation.y=h;
     p.car.rotation.x=-Math.atan2(H(x+fx*1.6,z+fz*1.6)-H(x-fx*1.6,z-fz*1.6),3.2);p.car.rotation.z=Math.atan2(H(x+fz*0.9,z-fx*0.9)-H(x-fz*0.9,z+fx*0.9),1.8);
@@ -2800,6 +2827,13 @@ function stepNet(dt){
         const an=p.man.userData.anim,cl=sp>2.6?'run':sp>0.15?'walk':heroIdle(heroKey(p.carId||'gmc'));if(an.name!==cl)AA.three.play(p.man,cl,0.2);if(an.current)an.current.timeScale=cl==='run'?sp/3.5:cl==='walk'?Math.max(0.5,sp/1.33):1;
         an.mixer.update(dt);tx=mx;tz=mz;ty=H(mx,mz)+2.25;}}
     else if(p.man&&p.man.visible)p.man.visible=false;
+    if(!far&&p.lamps){const sp=c.d[3],brake=(p.spPrev||0)-sp>2*dt||(sp<0.5&&p.mode===0&&(p.spPrev||0)>0.5);p.spPrev+=(sp-(p.spPrev||0))*Math.min(1,dt*4);
+      const nn=Math.min(1,smoothstep(0.35,0.75,env.n)+env.w.storm*0.8);setLamps(p.lamps,nn,brake&&sp>0.3,false);}
+    if(!far&&Math.hypot(x-FOC.x,z-FOC.z)<120){const rxv=Math.cos(h),rzv=-Math.sin(h),fxv=Math.sin(h),fzv=Math.cos(h),back=(p.len||CAR_LEN)*0.29,sp=c.d[3];
+      for(const [k,sd] of [[0,1],[1,-1]]){const wx=x-fxv*back+rxv*0.85*sd,wz=z-fzv*back+rzv*0.85*sd,pw=p['w'+k];
+        if(pw){const dd=Math.hypot(wx-pw[0],wz-pw[1]);if(dd>0.25&&dd<3){if(!onPaved(wx,wz))stamp(pw[0],pw[1],wx,wz,0.55,0.11);p['w'+k]=[wx,wz];}else if(dd>=3)p['w'+k]=[wx,wz];}else p['w'+k]=[wx,wz];
+        if(sp>4&&!onPaved(wx,wz)){let n=Math.min(1.4,sp*0.02)*2.2*(dt*60);while(n>0){if(Math.random()<n){const vx=fxv*sp,vz=fzv*sp;
+          emitDust(wx+(Math.random()-0.5)*0.6,H(wx,wz)+0.25,wz+(Math.random()-0.5)*0.6,vx*-0.22+(Math.random()-0.5)*2.5,1.6+Math.random()*2.4,vz*-0.22+(Math.random()-0.5)*2.5,1+Math.random()*0.9,4+Math.random()*3,1.8+Math.random()*2.4,0.3);}n-=1;}}}}
     if(!far){const ox=Math.sin(h),oz=Math.cos(h);for(const o of [1.5,0,-1.5])NET.obs.push({x:x+ox*o,z:z+oz*o,r:1.05,car:1});
       if(p.man&&p.man.visible)NET.obs.push({x:p.man.position.x,z:p.man.position.z,r:0.33});}
     p.tag.position.set(tx,ty,tz);p.tag.visible=!far;
@@ -2848,6 +2882,37 @@ function radPlay(buf){window.__rxBytes=(window.__rxBytes||0)+buf.byteLength;if(!
   ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>pb.addEventListener(ev,()=>radUp()));pb.addEventListener('contextmenu',e=>e.preventDefault());
   addEventListener('keydown',e=>{if(e.code==='KeyT'&&!e.repeat&&document.activeElement.tagName!=='INPUT')radDown();});addEventListener('keyup',e=>{if(e.code==='KeyT')radUp();});}
 window.__rad={down:radDown,up:radUp,set:radSetCh,st:RAD};
+/* ---------------- pulling a bogged player out: back up to him, the rope ties itself, drive away ---------------- */
+const PT={role:null,peer:null,still:0,pulled:0,rope:null};   // role: 'puller' (I pull) or 'pulled' (I am bogged)
+function ptRope(){if(!PT.rope){PT.rope=new T.Mesh(ropeGeo,ropeLine.material);PT.rope.castShadow=true;PT.rope.frustumCulled=false;scene.add(PT.rope);}PT.rope.visible=true;return PT.rope;}
+function ptEnd(why){if(PT.rope)PT.rope.visible=false;if(PT.role==='puller')S.taut=false;PT.role=null;PT.peer=null;PT.still=0;PT.pulled=0;}
+function peerEnds(p){const d=p.buf[p.buf.length-1].d,h=p.carH!=null?p.carH:d[2],x=p.cur[0],z=p.cur[1];return [[x+Math.sin(h)*2.6,z+Math.cos(h)*2.6],[x-Math.sin(h)*2.6,z-Math.cos(h)*2.6]];}
+function ptow(m){const p=NET.peers.get(m.i);
+  if(m.on){if(PT.role)return;PT.role='pulled';PT.peer=m.i;PT.pulled=0;showToast((p?p.name:'أحد')+' ربط فيك الحبل — بيسحبك',3);}
+  else{if(PT.peer!==m.i)return;const wasPuller=PT.role==='puller';ptEnd();showToast(m.ok?(wasPuller?'تسلم يا الذيب! طلّعته':'انسحبت — تسلم يالذيب'):'انقطع الحبل',2.6);}}
+function stepPT(dt){
+  if(!NET.ws||!NET.id||FOOT.st!=='off'){if(PT.role){netSend({t:'tow',to:PT.peer,on:0});ptEnd();}return;}
+  const [rx,rz]=carRear();
+  if(!PT.role){   // look for a bogged player whose bumper is close to my rear
+    let cand=null;NET.peers.forEach(p=>{if(!p.cur||!p.buf.length)return;const d=p.buf[p.buf.length-1].d;if(!d[10]||d[4])return;
+      for(const [ex,ez] of peerEnds(p))if(Math.hypot(ex-rx,ez-rz)<7.5)cand=p;});
+    if(cand&&S.spd<4){PT.still+=dt;if(PT.still>0.8){PT.role='puller';PT.peer=cand.id;PT.pulled=0;netSend({t:'tow',to:cand.id,on:1});showToast('انربط الحبل في '+cand.name+' — امشِ لقدّام واسحبه',3);}}
+    else{PT.still=0;if(cand&&!PT.hint){PT.hint=1;showToast(cand.name+' مغرّز! وقف بظهر سيارتك عند صدامه عشان تربط الحبل',3.5);}if(!cand)PT.hint=0;}
+    return;}
+  const p=NET.peers.get(PT.peer);if(!p||!p.cur){ptEnd();return;}
+  let a,b,L;
+  if(PT.role==='puller'){const e=peerEnds(p),i=Math.hypot(e[0][0]-rx,e[0][1]-rz)<Math.hypot(e[1][0]-rx,e[1][1]-rz)?0:1;a=e[i];b=[rx,rz];L=Math.hypot(a[0]-b[0],a[1]-b[1]);
+    S.taut=L>7.5;if(L>20){netSend({t:'tow',to:PT.peer,on:0});ptEnd();showToast('انقطع الحبل! ارجع واربطه',2.6);return;}
+    if(p.buf[p.buf.length-1].d[10]===0&&PT.pulled>0.5){}}
+  else{   // I am the bogged one: the rope drags my car towards the puller's rear and frees the wheels
+    const ph=p.carH!=null?p.carH:p.buf[p.buf.length-1].d[2],prx=p.cur[0]-Math.sin(ph)*2.95,prz=p.cur[1]-Math.cos(ph)*2.95;
+    const fx=Math.sin(S.h),fz=Math.cos(S.h),ends=[[S.x+fx*2.6,S.z+fz*2.6],[S.x-fx*2.6,S.z-fz*2.6]];const i=Math.hypot(ends[0][0]-prx,ends[0][1]-prz)<Math.hypot(ends[1][0]-prx,ends[1][1]-prz)?0:1;
+    a=ends[i];b=[prx,prz];L=Math.hypot(a[0]-b[0],a[1]-b[1]);
+    if(L>7.5){const ex=L-7.5,ux=(b[0]-a[0])/L,uz=(b[1]-a[1])/L,mv=Math.min(ex,0.5);S.x+=ux*mv;S.z+=uz*mv;PT.pulled+=mv;S.sink=Math.max(0,(S.sink||0)-mv*0.09);S.vx*=0.5;S.vz*=0.5;
+      if(Math.random()<0.5)emitDust(S.x,S.y+0.2,S.z,0,1.2,0,1,5,2,0.35);}
+    if(L>20){netSend({t:'tow',to:PT.peer,on:0});ptEnd();showToast('انقطع الحبل',2);return;}
+    if(PT.pulled>6&&(S.sink||0)<0.15){netSend({t:'tow',to:PT.peer,on:0,ok:1});ptEnd();showToast('انسحبت — تسلم يالذيب',2.6);return;}}
+  const r=ptRope(),A=new T.Vector3(a[0],H(a[0],a[1])+0.7,a[1]),B=new T.Vector3(b[0],H(b[0],b[1])+0.75,b[1]);r.position.copy(A);r.lookAt(B);r.scale.set(1,1,A.distanceTo(B));}
 // ---- horn and chat
 function hornSound(v){if(!snd.ctx)return;const c=snd.ctx,t=c.currentTime,g=c.createGain(),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;g.gain.setValueAtTime(0,t);
   g.gain.linearRampToValueAtTime(0.22*v,t+0.03);g.gain.setValueAtTime(0.22*v,t+0.42);g.gain.linearRampToValueAtTime(0,t+0.55);lp.connect(g);g.connect(snd.out||c.destination);
@@ -2900,7 +2965,7 @@ function frame(now){
 }
 // test hook: advance simulation deterministically without rAF timing
 window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){if(frozen()){updateVisual(DT);continue;}readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
-window.__world={CRIT,KS,FOOT,FOC,NET,footOut,footIn,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();if(FOOT.st!=='off')footCancel();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
+window.__world={CRIT,KS,FOOT,FOC,NET,get PT(){return PT;},footOut,footIn,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();if(FOOT.st!=='off')footCancel();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
 window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
 })();

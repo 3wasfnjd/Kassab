@@ -94,6 +94,11 @@ export class World {
       const out = JSON.stringify({ t: 'rx', i: a.id, on: 1 }); for (const s of this.chan(a.ch)) if (s !== ws) this.send(s, out);
       return;
     }
+    if (m.t === 'tow' && typeof m.to === 'string') {   // rope between two players: passed to the other one only
+      const out = JSON.stringify({ t: 'tow', i: a.id, on: m.on ? 1 : 0, ok: m.ok ? 1 : 0 });
+      for (const s of this.others(ws)) { const b = s.deserializeAttachment(); if (b && b.id === m.to) this.send(s, out); }
+      return;
+    }
     if (m.t === 'horn') { const out = JSON.stringify({ t: 'horn', i: a.id }); for (const s of this.others(ws)) this.send(s, out); return; }
     if (m.t === 'chat') {
       const now = Date.now(); if (now - (a.chatT || 0) < 2000) return;   // one message every 2 s
