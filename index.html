@@ -61,6 +61,23 @@ body.uihide .hud,body.uihide #map,body.uihide #reset,body.uihide #radio,body.uih
 body.uihide .pads,body.uihide #knobBase,body.uihide #awd,body.uihide #ftStick,body.uihide #ftRun{opacity:.14}   /* driving controls stay faintly visible and keep working */
 #camBtn{position:fixed;top:calc(214px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0}
+/* online */
+#nick{display:block;margin:0 auto 12px;width:min(240px,70vw);font:700 16px var(--font);text-align:center;padding:8px 12px;border-radius:12px;border:1.5px solid rgba(60,36,14,.35);background:rgba(255,248,232,.85);color:#2a2118}
+#netn{font-weight:800}
+#chatBtn{position:fixed;top:calc(76px + env(safe-area-inset-top,0px));right:calc(246px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
+  border:1.5px solid var(--rim);background:var(--glass);color:#fff;place-items:center;padding:0;z-index:6;display:none}
+body.menuopen.online #chatBtn{display:grid;animation:mnIn .18s ease-out both}
+#hornBtn{position:fixed;right:calc(18px + 96px + 12px + 7px + 52px + 10px + env(safe-area-inset-right,0px));bottom:calc(20px + 66px + 14px + env(safe-area-inset-bottom,0px));width:48px;height:48px;display:none}
+body.online #hornBtn{display:grid}body.title #hornBtn,body.photo #hornBtn,body.foot #hornBtn{display:none!important}
+body.uihide #hornBtn{opacity:.14}
+#chatLog{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));top:calc(240px + env(safe-area-inset-top,0px));width:min(300px,46vw);direction:rtl;pointer-events:none;font:700 13px var(--font);color:#fff;z-index:5}
+#chatLog div{background:rgba(40,26,12,.55);border-radius:10px;padding:4px 9px;margin-bottom:5px;text-shadow:0 1px 2px #000;transition:opacity .6s;word-break:break-word}
+#chatLog b{color:#ffcf8a;font-weight:800}
+#chatBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom,0px));display:flex;gap:6px;z-index:40;direction:rtl;width:min(520px,92vw)}
+#chatBar input{flex:1;font:700 15px var(--font);padding:9px 12px;border-radius:12px;border:1.5px solid var(--rim);background:rgba(255,248,232,.95);color:#2a2118}
+#chatBar button{font:800 14px var(--font);padding:0 12px;border-radius:12px;border:1.5px solid var(--rim);background:rgba(58,40,22,.85);color:#fff}
+#chatMute.on{color:#ffb35c;border-color:#ffb35c}
+body.title #chatLog,body.photo #chatLog,body.photo #chatBar{display:none!important}
 /* one menu button holds the less-used controls (reset, radio, weather, camera); kashta and walk stay out */
 #menuBtn{position:fixed;top:calc(76px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));width:40px;height:40px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;display:grid;place-items:center;padding:0;z-index:6}
@@ -210,6 +227,10 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <button id="ksBtn" aria-label="كشتة" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1.6 2.4 4 4.1 4 7.2a4 4 0 0 1-8 0c0-1.4.6-2.4 1.5-3.3.2 1.3.9 2 1.7 2.3C11 7.3 11.2 5 12 3z"/><path d="M4 20.5l16-4M4 16.5l16 4"/></svg></button>
 <button id="footBtn" aria-label="انزل تمشّى" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="M10.5 21l1.8-6.2L15 17v4M9 12.5l1.6-4.3 3.4 1.2 2 3M12.3 14.8l.9-5.6"/></svg></button>
 <div id="footUI"><div id="ftLook"></div><div id="ftStick"><div id="ftKnob"></div></div><button id="ftRun" aria-label="ركض">ركض</button><button id="ftIn" aria-label="اركب السيارة" hidden>اركب</button></div>
+<button id="chatBtn" aria-label="الدردشة"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg></button>
+<button id="hornBtn" class="btn" aria-label="بوري"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h3l6 4V6L6 10z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg></button>
+<div id="chatLog" aria-live="polite"></div>
+<div id="chatBar" hidden><input id="chatIn" maxlength="120" placeholder="اكتب رسالة…" dir="auto" autocomplete="off" enterkeyhint="send"><button id="chatSend">إرسال</button><button id="chatMute" aria-label="إخفاء رسائل الناس">🔕</button><button id="chatX" aria-label="إغلاق">✕</button></div>
 <div id="photoUI" aria-label="وضع التصوير">
   <div id="phLook"></div>
   <div id="phTop"><button data-m="drone" class="on">درون</button><button data-m="cam">كاميرا</button><button id="phFreeze" class="on" aria-label="تجميد اللقطة">⏸ تجميد</button></div>
@@ -244,7 +265,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
   <button class="btn" id="gas" aria-label="بنزين"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V5M5 12l7-7 7 7"/></svg></button>
 </div>
 <canvas id="map" width="240" height="240" aria-label="الخريطة"></canvas>
-<div id="wx"><span id="clk">--</span> · <span id="wxn">صحو</span></div>
+<div id="wx"><span id="clk">--</span> · <span id="wxn">صحو</span><span id="netn"></span></div>
 <div id="toast" hidden></div>
 <div id="build" hidden>يبني العالم <span id="bp">0</span>٪</div>
 <div id="rot" role="img" aria-label="دوّر الجوال بالعرض"><svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -254,6 +275,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <div id="title">
   <h1>كسّاب</h1>
   <p>اهداء لصديقي ابوحصه 💕</p>
+  <input id="nick" maxlength="16" placeholder="اسمك في الأونلاين" dir="auto" autocomplete="off" hidden>
   <button id="start" hidden>ابدأ</button>
 </div>
 
@@ -1684,6 +1706,7 @@ function drawMap(){
   movers.forEach(m=>{if(m.x==null)return;const [mx,mz]=toP(m.x,m.z);mctx.fillStyle='#e9e1d0';mctx.beginPath();mctx.arc(mx,mz,mapBig?4:5,0,6.283);mctx.fill();});
   if(mapBig){mctx.font='bold 12px "Baloo Bhaijaan 2",Tahoma,sans-serif';mctx.textAlign='right';mctx.fillStyle='#d9822b';mctx.fillRect(W-22,W-20,9,9);
     mctx.fillStyle='#2a2118';mctx.fillText('خيّالة',W-28,W-12);}
+  NET.peers.forEach(p=>{if(!p.cur)return;const [px,pz]=toP(p.cur[0],p.cur[1]);mctx.fillStyle='#3d8bd9';mctx.strokeStyle='#fff';mctx.lineWidth=1.5;mctx.beginPath();mctx.arc(px,pz,mapBig?5:6,0,6.283);mctx.fill();mctx.stroke();});
   if(FOOT.st==='on'){const [fx2,fz2]=toP(FOOT.x,FOOT.z);mctx.fillStyle='#ffb35c';mctx.strokeStyle='#2a2118';mctx.lineWidth=2;mctx.beginPath();mctx.arc(fx2,fz2,mapBig?5:7,0,6.283);mctx.fill();mctx.stroke();}
   const [cx,cz]=toP(S.x,S.z);mctx.save();mctx.translate(cx,cz);mctx.rotate(-S.h+PI);
   mctx.fillStyle='#fff';mctx.strokeStyle='#2a2118';mctx.lineWidth=2;mctx.beginPath();mctx.moveTo(0,-12);mctx.lineTo(8,9);mctx.lineTo(0,5);mctx.lineTo(-8,9);mctx.closePath();mctx.fill();mctx.stroke();mctx.restore();
@@ -2135,7 +2158,7 @@ audio.addEventListener('ended',()=>{if(station)tune(station%RADIO.length+1);});
     rec.start(500);PH.rec=rec;recT0=performance.now();$('phRec').classList.add('on');$('phTime').style.display='block';
     recTimer=setInterval(()=>{const s=(performance.now()-recT0)/1000|0;$('phTime').textContent=AR(Math.floor(s/60))+':'+AR(String(s%60).padStart(2,'0'));if(s>=60)stopRec();},250);});}
 // the menu: opens a row of the less-used buttons; any choice or a tap elsewhere closes it
-{const mb=document.getElementById('menuBtn'),items=['reset','radio','wxBtn','camBtn'].map(id=>document.getElementById(id));
+{const mb=document.getElementById('menuBtn'),items=['reset','radio','wxBtn','camBtn','chatBtn'].map(id=>document.getElementById(id));
   const setM=v=>{document.body.classList.toggle('menuopen',v);mb.classList.toggle('on',v);mb.setAttribute('aria-expanded',v);};
   mb.addEventListener('click',e=>{e.stopPropagation();setM(!document.body.classList.contains('menuopen'));});
   items.forEach(b=>b.addEventListener('click',()=>setTimeout(()=>setM(false),0)));
@@ -2335,7 +2358,7 @@ async function loadCarSplit(name){
   return{g,tex};}
 const loadEl=document.getElementById('load'),loadBar=document.getElementById('loadbar'),loadTx=document.getElementById('loadtx'),startEl=document.getElementById('start');
 // the Start button appears only once the model is actually on screen: wait for it to be drawn, then fade the button in
-function carLoadDone(){loadEl.hidden=true;const show=()=>{startEl.hidden=false;startEl.classList.add('show');};
+function carLoadDone(){loadEl.hidden=true;const show=()=>{startEl.hidden=false;startEl.classList.add('show');document.getElementById('nick').hidden=false;};
   if(window.__noLoop){show();return;}requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(show,500)));}
 setInterval(()=>{if(loadEl.hidden)return;const k=carLoad.total?Math.min(0.99,carLoad.got/carLoad.total):0;loadBar.style.width=(k*100).toFixed(1)+'%';
   loadEl.setAttribute('aria-valuenow',Math.round(k*100));loadTx.textContent=Math.round(k*100).toLocaleString('ar-SA')+'٪';},150);
@@ -2601,9 +2624,99 @@ function footCam(dt){if(FOOT.camW<=0.001||!FOOT.g)return;const w=FOOT.camW*FOOT.
   const endL=()=>{lid=null;FOOT.look=false;};lk.addEventListener('pointerup',endL);lk.addEventListener('pointercancel',endL);
   const rb=$('ftRun');rb.addEventListener('pointerdown',e=>{FOOT.run=true;rb.classList.add('on');rb.setPointerCapture(e.pointerId);e.preventDefault();});
   const rup=()=>{FOOT.run=false;rb.classList.remove('on');};rb.addEventListener('pointerup',rup);rb.addEventListener('pointercancel',rup);}
+/* ---------------- online: one public world (Cloudflare Durable Object shards); cars, walking, horn and chat ---------------- */
+const NET={ws:null,url:null,id:null,peers:new Map(),shard:1,sendT:0,idleT:0,last:null,name:'',retry:0,muted:false,pingT:0,n:0};
+const AR_N=n=>Number(n).toLocaleString('ar-SA');
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function netStart(){if(NET.url||NET.ws)return;
+  const go=u=>{if(!u)return;NET.url=u;netConnect();};
+  if(window.__netUrl)return go(window.__netUrl);
+  fetch('online.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>go(j&&j.ws)).catch(()=>{});}
+function netConnect(){
+  let opened=false,ws;try{ws=new WebSocket(NET.url+'?w='+NET.shard);}catch(e){return;}
+  ws.onopen=()=>{opened=true;NET.ws=ws;NET.retry=0;ws.send(JSON.stringify({t:'hi',name:NET.name,car:'gmc'}));};
+  ws.onmessage=e=>{if(e.data==='pong')return;let m;try{m=JSON.parse(e.data);}catch(er){return;}netMsg(m);};
+  ws.onclose=()=>{if(NET.ws===ws)NET.ws=null;netClearPeers();document.body.classList.remove('online');netBadge();
+    if(!opened&&NET.shard<12){NET.shard++;setTimeout(netConnect,300);return;}   // shard full or unreachable: try the next one
+    NET.shard=1;NET.retry++;setTimeout(netConnect,Math.min(30000,2000*Math.pow(2,Math.min(4,NET.retry))));};
+  ws.onerror=()=>{};}
+function netSend(o){if(NET.ws&&NET.ws.readyState===1)NET.ws.send(typeof o==='string'?o:JSON.stringify(o));}
+function netBadge(){const el=document.getElementById('netn');if(!el)return;el.textContent=NET.ws&&NET.id?' · أونلاين '+AR_N(NET.peers.size+1):'';}
+function netMsg(m){
+  if(m.t==='welcome'){NET.id=m.i;document.body.classList.add('online');(m.players||[]).forEach(p=>{const pr=netPeer(p.i,p.n);if(p.d)netPush(pr,p.d);});netBadge();showToast('دخلت الأونلاين — '+AR_N(NET.peers.size+1)+' بالعالم',2.2);}
+  else if(m.t==='join'){netPeer(m.i,m.n);netBadge();chatLine(null,m.n+' دخل العالم');}
+  else if(m.t==='leave'){const p=NET.peers.get(m.i);if(p){netDrop(p);NET.peers.delete(m.i);netBadge();chatLine(null,p.name+' طلع');}}
+  else if(m.t==='s'){const p=NET.peers.get(m.i)||netPeer(m.i,'…');netPush(p,m.d);}
+  else if(m.t==='horn'){const p=NET.peers.get(m.i);if(p&&p.cur){const d=Math.hypot(p.cur[0]-FOC.x,p.cur[1]-FOC.z);if(d<160)hornSound(Math.max(0.05,1-d/160));}}
+  else if(m.t==='chat'){if(m.i===NET.id){chatLine(m.n,m.m,true);return;}if(NET.muted)return;chatLine(m.n,m.m);const p=NET.peers.get(m.i);if(p)peerBubble(p,m.m);}}
+// ---- peers
+function tagSprite(text,w,h,font,bg){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
+  x.font=font;x.textAlign='center';x.textBaseline='middle';x.direction='rtl';
+  if(bg){x.fillStyle=bg;const tw=Math.min(w-8,x.measureText(text).width+28);x.beginPath();x.roundRect?x.roundRect((w-tw)/2,6,tw,h-12,16):x.rect((w-tw)/2,6,tw,h-12);x.fill();}
+  x.lineWidth=5;x.strokeStyle='rgba(20,12,4,.85)';x.strokeText(text,w/2,h/2+1);x.fillStyle='#fff';x.fillText(text,w/2,h/2+1);
+  const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;const sp=new T.Sprite(new T.SpriteMaterial({map:t,depthWrite:false,transparent:true}));sp.renderOrder=5;return sp;}
+function netPeer(id,name){let p=NET.peers.get(id);if(p){if(name&&name!=='…'&&p.name!==name){p.name=name;peerTag(p);}return p;}
+  p={id,name:name||'…',buf:[],car:new T.Group(),man:null,cur:null,mode:0,bubbleT:0};scene.add(p.car);peerTag(p);NET.peers.set(id,p);return p;}
+function peerTag(p){if(p.tag){p.tag.parent&&p.tag.parent.remove(p.tag);p.tag.material.map.dispose();p.tag.material.dispose();}
+  p.tag=tagSprite(p.name,256,64,'800 34px "Baloo Bhaijaan 2",Tahoma,sans-serif');p.tag.scale.set(2.6,0.65,1);scene.add(p.tag);}
+function peerBubble(p,text){if(p.bub){scene.remove(p.bub);p.bub.material.map.dispose();p.bub.material.dispose();}
+  p.bub=tagSprite(text.length>34?text.slice(0,33)+'…':text,640,90,'700 34px "Baloo Bhaijaan 2",Tahoma,sans-serif','rgba(255,248,232,.92)');
+  p.bub.material.map.image.getContext('2d');p.bub.scale.set(5.2,0.73,1);scene.add(p.bub);p.bubbleT=6;}
+function netDrop(p){[p.car,p.tag,p.bub,p.man].forEach(o=>{if(o&&o.parent)o.parent.remove(o);});}
+function netClearPeers(){NET.peers.forEach(netDrop);NET.peers.clear();NET.id=null;}
+function netPush(p,d){p.buf.push({t:performance.now()/1000,d});if(p.buf.length>12)p.buf.shift();}
+function peerCarMesh(p){if(p.carMesh||!carModels.light)return;const m=carModels.light.clone();m.visible=true;p.car.add(m);p.carMesh=m;}
+function cloneMan(){if(!MAN.ok)return null;const ud=MAN.g.userData;MAN.g.userData={};const c=MAN.g.clone(true);MAN.g.userData=ud;
+  const srcMesh=[],dstMesh=[],bones={};MAN.g.traverse(o=>{if(o.isSkinnedMesh)srcMesh.push(o);});c.traverse(o=>{if(o.isSkinnedMesh)dstMesh.push(o);if(o.isBone)bones[o.name]=o;});
+  dstMesh.forEach((m,i)=>{const s=srcMesh[i];m.bind(new T.Skeleton(s.skeleton.bones.map(b=>bones[b.name]),s.skeleton.boneInverses),s.bindMatrix);});
+  c.userData.anim={mixer:new T.AnimationMixer(c.children[0]),clips:ud.anim.clips,current:null};AA.three.play(c,'idle',0);return c;}
+const _np=new T.Vector3();
+function stepNet(dt){
+  if(!NET.ws||!NET.id){return;}
+  // send our state: 8 times a second while something moves, every 2 s when still
+  NET.sendT-=dt;NET.pingT-=dt;
+  const ft=FOOT.st==='on',d=[S.x,S.z,S.h,Math.hypot(S.vx,S.vz),ft?1:0,ft?FOOT.x:0,ft?FOOT.z:0,ft?FOOT.h:0,ft?FOOT.sp:0,KS.st!=='off'?1:0];
+  const moved=!NET.last||Math.abs(d[0]-NET.last[0])+Math.abs(d[1]-NET.last[1])+Math.abs(d[2]-NET.last[2])*3+Math.abs(d[5]-NET.last[5])+Math.abs(d[6]-NET.last[6])+Math.abs(d[4]-NET.last[4])>0.03;
+  if(NET.sendT<=0&&(moved||NET.idleT<=0)){netSend({t:'s',d});NET.last=d;NET.sendT=0.125;NET.idleT=2;}else NET.idleT-=dt;
+  if(NET.pingT<=0){NET.pingT=25;netSend('ping');}
+  // draw the others ~180 ms in the past, between two received states
+  const now=performance.now()/1000-0.18;
+  NET.peers.forEach(p=>{const b=p.buf;if(!b.length)return;let a=b[0],c=b[b.length-1],k=1;
+    for(let i=0;i<b.length-1;i++)if(b[i].t<=now&&b[i+1].t>=now){a=b[i];c=b[i+1];k=(now-a.t)/Math.max(1e-3,c.t-a.t);break;}
+    if(now<b[0].t){a=c=b[0];k=0;}
+    const L=(i)=>a.d[i]+(c.d[i]-a.d[i])*k,LA=(i)=>{let dh=c.d[i]-a.d[i];dh=Math.atan2(Math.sin(dh),Math.cos(dh));return a.d[i]+dh*k;};
+    const x=L(0),z=L(1),h=LA(2);p.cur=[x,z];p.mode=c.d[4];
+    peerCarMesh(p);const far=Math.hypot(x-FOC.x,z-FOC.z)>300;p.car.visible=!far;
+    const fx=Math.sin(h),fz=Math.cos(h),y=H(x,z);p.car.position.set(x,y,z);p.car.rotation.order='YXZ';p.car.rotation.y=h;
+    p.car.rotation.x=-Math.atan2(H(x+fx*1.6,z+fz*1.6)-H(x-fx*1.6,z-fz*1.6),3.2);p.car.rotation.z=Math.atan2(H(x+fz*0.9,z-fx*0.9)-H(x-fz*0.9,z+fx*0.9),1.8);
+    let tx=x,ty=y+2.7,tz=z;
+    if(p.mode===1){if(!p.man){p.man=cloneMan();if(p.man)scene.add(p.man);}
+      if(p.man){const mx=L(5),mz=L(6),mh=LA(7),sp=c.d[8];p.man.visible=!far;p.man.position.set(mx,H(mx,mz)-0.02,mz);p.man.rotation.y=mh;
+        const an=p.man.userData.anim,cl=sp>2.6?'run':sp>0.15?'walk':'idle';if(an.name!==cl)AA.three.play(p.man,cl,0.2);if(an.current)an.current.timeScale=cl==='run'?sp/3.5:cl==='walk'?Math.max(0.5,sp/1.33):1;
+        an.mixer.update(dt);tx=mx;tz=mz;ty=H(mx,mz)+2.25;}}
+    else if(p.man&&p.man.visible)p.man.visible=false;
+    p.tag.position.set(tx,ty,tz);p.tag.visible=!far;
+    if(p.bub){p.bubbleT-=dt;p.bub.position.set(tx,ty+0.75,tz);p.bub.visible=!far;if(p.bubbleT<=0){scene.remove(p.bub);p.bub.material.map.dispose();p.bub.material.dispose();p.bub=null;}}});}
+// ---- horn and chat
+function hornSound(v){if(!snd.ctx)return;const c=snd.ctx,t=c.currentTime,g=c.createGain(),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(0.22*v,t+0.03);g.gain.setValueAtTime(0.22*v,t+0.42);g.gain.linearRampToValueAtTime(0,t+0.55);lp.connect(g);g.connect(snd.out||c.destination);
+  [392,494].forEach(f=>{const o=c.createOscillator();o.type='sawtooth';o.frequency.value=f;o.connect(lp);o.start(t);o.stop(t+0.6);});}
+function chatLine(name,text,mine){const log=document.getElementById('chatLog'),d=document.createElement('div');
+  if(name){const b=document.createElement('b');b.textContent=name+': ';d.appendChild(b);}d.appendChild(document.createTextNode(text));if(!name)d.style.opacity='.8';
+  log.appendChild(d);while(log.children.length>5)log.removeChild(log.firstChild);setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),700);},mine?6000:9000);}
+{const $=id=>document.getElementById(id),bar=$('chatBar'),inp=$('chatIn');
+  const openC=v=>{bar.hidden=!v;if(v)setTimeout(()=>inp.focus(),30);else inp.blur();};
+  $('chatBtn').addEventListener('click',()=>openC(bar.hidden));$('chatX').addEventListener('click',()=>openC(false));
+  const sendC=()=>{const m=inp.value.trim();if(!m)return;netSend({t:'chat',m});inp.value='';openC(false);};
+  $('chatSend').addEventListener('click',sendC);inp.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')sendC();if(e.key==='Escape')openC(false);});
+  inp.addEventListener('keyup',e=>e.stopPropagation());
+  $('chatMute').addEventListener('click',()=>{NET.muted=!NET.muted;$('chatMute').classList.toggle('on',NET.muted);showToast(NET.muted?'رسائل الناس مخفية':'رسائل الناس ظاهرة',1.6);});
+  $('hornBtn').addEventListener('pointerdown',e=>{e.preventDefault();hornSound(1);netSend({t:'horn'});});
+  const nk=$('nick');nk.value=lsGet('kassab_name')||'';}
 function worldTick(dt,now){
   if(!CRIT.ready&&AAok&&queue.length===0)initCritters();
-  stepCritters(dt);stepKashta(dt);stepFoot(dt);
+  stepCritters(dt);stepKashta(dt);stepFoot(dt);stepNet(dt);
   wT+=dt;game.clock+=dt;
   updateChunks(FOC.x,FOC.z,1);recenterTrail(FOC.x,FOC.z);
   soundTick(dt);envTick(dt);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}
@@ -2612,7 +2725,9 @@ function worldTick(dt,now){
 }
 /* title screen */
 document.body.classList.add('title');
-document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='title')return;game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();if(!station)tune(1); // radio starts with the same tap as the engine
+document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='title')return;
+  {const nk=document.getElementById('nick');NET.name=(nk.value||'').trim().slice(0,16);if(NET.name)lsSet('kassab_name',NET.name);nk.blur();nk.hidden=true;netStart();}   // online starts with the drive
+  game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();if(!station)tune(1); // radio starts with the same tap as the engine
   // full screen + landscape where the browser allows it (hides the bars, so fewer edge swipes); ignored where refused
   try{const el=document.documentElement,fs=el.requestFullscreen||el.webkitRequestFullscreen;if(fs){const pr=fs.call(el,{navigationUI:'hide'});if(pr&&pr.then)pr.then(()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}}catch(e){}
   if(!carModels.hq&&carModels.light)useCar(carModels.light); // original not ready yet: drive the light one
@@ -2635,7 +2750,7 @@ function frame(now){
 }
 // test hook: advance simulation deterministically without rAF timing
 window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){if(frozen()){updateVisual(DT);continue;}readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
-window.__world={CRIT,KS,FOOT,FOC,footOut,footIn,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();if(FOOT.st!=='off')footCancel();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
+window.__world={CRIT,KS,FOOT,FOC,NET,footOut,footIn,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();if(FOOT.st!=='off')footCancel();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
 window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
 })();
