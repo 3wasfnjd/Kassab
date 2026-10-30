@@ -74,6 +74,8 @@ body.uihide .pads,body.uihide #knobBase,body.uihide #awd,body.uihide #ftStick,bo
 #ftKnob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(255,255,255,.85);pointer-events:none}
 #ftRun{position:fixed;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));width:84px;height:84px;border-radius:50%;
   border:1.5px solid var(--rim);background:var(--glass);color:#fff;font:800 16px var(--font);touch-action:none}
+#ftIn{position:fixed;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(124px + env(safe-area-inset-bottom,0px));height:46px;padding:0 22px;border-radius:23px;
+  border:1.5px solid #ffb35c;background:rgba(58,40,22,.78);color:#ffb35c;font:800 17px var(--font);touch-action:manipulation}
 #ftRun.on{background:var(--glass-hi);border-color:#ffb35c;color:#ffb35c}
 body.foot .pads,body.foot #steer,body.foot #awd,body.foot .hud,body.foot #ksBtn,body.foot #camBtn{display:none!important}
 #photoUI{position:fixed;inset:0;display:none;pointer-events:none;z-index:20;font:700 13px var(--font);color:#fff}
@@ -194,7 +196,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <button id="camBtn" aria-label="وضع التصوير"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg></button>
 <button id="ksBtn" aria-label="كشتة" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1.6 2.4 4 4.1 4 7.2a4 4 0 0 1-8 0c0-1.4.6-2.4 1.5-3.3.2 1.3.9 2 1.7 2.3C11 7.3 11.2 5 12 3z"/><path d="M4 20.5l16-4M4 16.5l16 4"/></svg></button>
 <button id="footBtn" aria-label="انزل تمشّى" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="M10.5 21l1.8-6.2L15 17v4M9 12.5l1.6-4.3 3.4 1.2 2 3M12.3 14.8l.9-5.6"/></svg></button>
-<div id="footUI"><div id="ftLook"></div><div id="ftStick"><div id="ftKnob"></div></div><button id="ftRun" aria-label="ركض">ركض</button></div>
+<div id="footUI"><div id="ftLook"></div><div id="ftStick"><div id="ftKnob"></div></div><button id="ftRun" aria-label="ركض">ركض</button><button id="ftIn" aria-label="اركب السيارة" hidden>اركب</button></div>
 <div id="photoUI" aria-label="وضع التصوير">
   <div id="phLook"></div>
   <div id="phTop"><button data-m="drone" class="on">درون</button><button data-m="cam">كاميرا</button><button id="phFreeze" class="on" aria-label="تجميد اللقطة">⏸ تجميد</button></div>
@@ -2437,7 +2439,7 @@ function kashtaCam(dt){if(KS.camW<=0.001||!KS.grp)return;const w=KS.camW*KS.camW
   _kq.set(KS.x+Math.sin(KS.ca)*8.2,KS.y+4.2,KS.z+Math.cos(KS.ca)*8.2);const gy=H(_kq.x,_kq.z)+1.6;if(_kq.y<gy)_kq.y=gy;
   _kl.copy(camState.look).lerp(_p.set(lx,KS.y+0.6,lz),w);camera.position.lerp(_kq,w);camera.lookAt(_kl);}
 /* ---------------- on foot: the driver gets out and walks the world; the car waits where he left it ---------------- */
-const footBtn=document.getElementById('footBtn'),_fwq=new T.Vector3(),_ftl=new T.Vector3();
+const footBtn=document.getElementById('footBtn'),ftInBtn=document.getElementById('ftIn'),_fwq=new T.Vector3(),_ftl=new T.Vector3();
 function footBlockedAt(x,z){return waterY(x,z)>H(x,z)+0.6;}
 function footCollide(){const r=0.32;
   for(const c of staticC){const dx=FOOT.x-c.x,dz=FOOT.z-c.z,d=Math.hypot(dx,dz),m=c.r+r;if(d<m&&d>1e-4){FOOT.x+=dx/d*(m-d);FOOT.z+=dz/d*(m-d);}}
@@ -2459,8 +2461,9 @@ function footBegin(){
   document.body.classList.add('foot');showToast('تمشّى بالدائرة يسار، واسحب يمين الشاشة تلف الكاميرا',2.8);}
 function footIn(){const d=Math.hypot(FOOT.x-S.x,FOOT.z-S.z);
   if(d>4.5){const m=Math.round(d);showToast('ارجع للسيارة عشان تركب — تبعد '+m.toLocaleString('ar-SA')+' م',2.4);return;}
-  FOOT.st='off';FOOT.g.visible=false;document.body.classList.remove('foot');footBtn.classList.remove('on');footBtn.setAttribute('aria-pressed','false');FOOT.stick.x=FOOT.stick.y=0;FOOT.run=false;camState.init=false;resize();}
+  FOOT.st='off';FOOT.g.visible=false;ftInBtn.hidden=true;document.body.classList.remove('foot');footBtn.classList.remove('on');footBtn.setAttribute('aria-pressed','false');FOOT.stick.x=FOOT.stick.y=0;FOOT.run=false;camState.init=false;resize();}
 function footCancel(){if(FOOT.st==='off')return;if(FOOT.st==='on'){FOOT.x=S.x;FOOT.z=S.z;}footIn();if(FOOT.st!=='off'){FOOT.st='off';footBtn.classList.remove('on');}}
+ftInBtn.addEventListener('click',()=>{if(FOOT.st==='on')footIn();});
 footBtn.addEventListener('click',()=>{if(FOOT.st==='off')footOut();else if(FOOT.st==='stop'){FOOT.st='off';footBtn.classList.remove('on');}else footIn();});
 function footPlay(c,ts){if(FOOT.clip!==c){FOOT.clip=c;AA.three.play(FOOT.g,c,0.2);}const a=FOOT.g.userData.anim;if(a&&a.current)a.current.timeScale=ts||1;}
 function stepFoot(dt){
@@ -2486,6 +2489,7 @@ function stepFoot(dt){
   FOOT.g.position.set(FOOT.x,FOOT.y-0.02,FOOT.z);FOOT.g.rotation.y=FOOT.h;
   if(FOOT.sp>0.15)footPlay('walk',Math.min(3,FOOT.sp/(FOOT.sp>2.5?1.3:1.05)));else footPlay('idle',1);
   if(FOOT.g.userData.anim)FOOT.g.userData.anim.mixer.update(dt);
+  {const near=Math.hypot(FOOT.x-S.x,FOOT.z-S.z)<4.5;if(near===ftInBtn.hidden)ftInBtn.hidden=!near;}   // a big 'get in' button appears beside the car
   // the camera swings round behind him while he walks
   if(FOOT.sp>0.5&&!FOOT.look){let dh=FOOT.h-FOOT.cyaw;dh=Math.atan2(Math.sin(dh),Math.cos(dh));FOOT.cyaw+=dh*Math.min(1,dt*0.9*Math.min(1,FOOT.sp/1.7));}}
 function footCam(dt){if(FOOT.camW<=0.001||!FOOT.g)return;const w=FOOT.camW*FOOT.camW*(3-2*FOOT.camW);
