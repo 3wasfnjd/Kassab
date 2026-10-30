@@ -303,7 +303,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
   <h1>كسّاب</h1>
   <p>اهداء لصديقي ابوحصه 💕</p>
   <input id="nick" maxlength="16" placeholder="اسمك في الأونلاين" dir="auto" autocomplete="off" hidden>
-  <div id="carPick" hidden><button data-car="gmc">جمس</button><button data-car="haval">هافال</button></div>
+  <div id="carPick" hidden><button data-car="gmc">جمس</button><button data-car="haval">هافال · عبودين</button></div>
   <button id="start" hidden>ابدأ</button>
 </div>
 
@@ -2639,6 +2639,10 @@ function footCancel(){if(FOOT.st==='off')return;if(FOOT.st==='on'){FOOT.x=S.x;FO
 ftInBtn.addEventListener('click',()=>{if(FOOT.st==='on')footIn();});
 ftSitBtn.addEventListener('click',()=>{if(FOOT.st!=='on')return;if(FOOT.sit)footStand();else if(FOOT.seatCand)footSit(FOOT.seatCand);});
 footBtn.addEventListener('click',()=>{if(FOOT.st==='off')footOut();else if(FOOT.st==='stop'){FOOT.st='off';footBtn.classList.remove('on');}else footIn();});
+let heroTag=null;
+function heroTagStep(){const want=FOOT.st==='on'&&heroKey()==='aboden'&&FOOT.g;
+  if(want&&!heroTag){heroTag=tagSprite('عبودين',256,64,'800 34px "Baloo Bhaijaan 2",Tahoma,sans-serif');heroTag.scale.set(2.2,0.55,1);scene.add(heroTag);}
+  if(heroTag){heroTag.visible=!!want;if(want)heroTag.position.set(FOOT.x,FOOT.y+(FOOT.sit?1.55:2.2),FOOT.z);}}
 function footPlay(c,ts){if(FOOT.clip!==c){FOOT.clip=c;AA.three.play(FOOT.g,c,0.2);}const a=FOOT.g.userData.anim;if(a&&a.current)a.current.timeScale=ts||1;}
 function stepFoot(dt){
   if(FOOT.st==='off'){FOOT.camW=Math.max(0,FOOT.camW-dt*1.6);return;}
@@ -2678,7 +2682,7 @@ function footSeatNear(){let best=null,bd=2.4;
   return best;}
 function footSit(st){FOOT.sit=st;ftSitBtn.hidden=false;ftSitBtn.textContent='قوم';}
 function footStand(){if(!FOOT.sit)return;const st=FOOT.sit;FOOT.sit=null;FOOT.x=st.x-Math.sin(st.h)*0.9;FOOT.z=st.z-Math.cos(st.h)*0.9;FOOT.clip=null;ftSitBtn.textContent='اجلس';ftSitBtn.hidden=true;}
-function footCam(dt){if(FOOT.camW<=0.001||!FOOT.g)return;const w=FOOT.camW*FOOT.camW*(3-2*FOOT.camW);
+function footCam(dt){heroTagStep();if(FOOT.camW<=0.001||!FOOT.g)return;const w=FOOT.camW*FOOT.camW*(3-2*FOOT.camW);
   const cf=Math.sin(FOOT.cyaw),cz=Math.cos(FOOT.cyaw);_fwq.set(FOOT.x-cf*6.2,FOOT.y+3.4,FOOT.z-cz*6.2);const gy=H(_fwq.x,_fwq.z)+1.2;if(_fwq.y<gy)_fwq.y=gy;
   _ftl.set(FOOT.x+cf*1.2,FOOT.y+1.1,FOOT.z+cz*1.2);
   camera.position.lerp(_fwq,w);_p.copy(camState.look).lerp(_ftl,w);camera.lookAt(_p);}
