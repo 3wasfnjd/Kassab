@@ -1,4 +1,5 @@
 name = "kassab-online"
+account_id = "f6fb852b9faeb761827bb662df031b29"
 main = "worker.js"
 compatibility_date = "2025-09-01"
 

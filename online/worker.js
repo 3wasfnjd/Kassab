@@ -39,13 +39,25 @@ export class World {
     const [client, server] = Object.values(new WebSocketPair());
     const id = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
     this.state.acceptWebSocket(server);
-    server.serializeAttachment({ id, name: '', car: 'gmc', d: null, chatT: 0, n: 0 });
+    server.serializeAttachment({ id, name: '', car: 'gmc', d: null, chatT: 0, ch: 0, talk: 0 });
     return new Response(null, { status: 101, webSocket: client });
   }
   others(ws) { return this.state.getWebSockets().filter(s => s !== ws); }
   send(s, o) { try { s.send(typeof o === 'string' ? o : JSON.stringify(o)); } catch (e) {} }
+  // «الكينود»: walkie-talkie channels 1-16. One speaker per channel at a time, 20 s per press;
+  // voice arrives as small binary frames (8 kHz mu-law) and goes only to the same channel.
+  chan(c) { return this.state.getWebSockets().filter(s => { const a = s.deserializeAttachment(); return a && a.ch === c; }); }
+  talker(c) { const now = Date.now(); for (const s of this.chan(c)) { const a = s.deserializeAttachment(); if (a.talk && now - a.talk < 20000) return s; } return null; }
+  stopTalk(ws, a) { if (!a.talk) return; a.talk = 0; ws.serializeAttachment(a); const out = JSON.stringify({ t: 'rx', i: a.id, on: 0 }); for (const s of this.chan(a.ch)) if (s !== ws) this.send(s, out); }
   webSocketMessage(ws, msg) {
-    if (typeof msg !== 'string' || msg.length > 600) return;
+    if (typeof msg !== 'string') {   // voice frame
+      const a = ws.deserializeAttachment(); if (!a || !a.ch || !a.talk) return;
+      if (Date.now() - a.talk > 20000) { this.stopTalk(ws, a); this.send(ws, { t: 'ptt', ok: 0, why: 'time' }); return; }
+      if (msg.byteLength > 2048) return;
+      for (const s of this.chan(a.ch)) if (s !== ws) { try { s.send(msg); } catch (e) {} }
+      return;
+    }
+    if (msg.length > 600) return;
     let m; try { m = JSON.parse(msg); } catch (e) { return; }
     const a = ws.deserializeAttachment() || {};
     if (m.t === 'hi') {
@@ -66,6 +78,19 @@ export class World {
       for (const s of this.others(ws)) this.send(s, out);
       return;
     }
+    if (m.t === 'ch') {
+      const c = Math.max(0, Math.min(16, m.c | 0)); this.stopTalk(ws, a); a.ch = c; ws.serializeAttachment(a);
+      const t = c ? this.talker(c) : null; if (t) { const ta = t.deserializeAttachment(); this.send(ws, { t: 'rx', i: ta.id, on: 1 }); }
+      return;
+    }
+    if (m.t === 'ptt') {
+      if (!m.on) { this.stopTalk(ws, a); return; }
+      if (!a.ch) return;
+      const t = this.talker(a.ch); if (t && t !== ws) { this.send(ws, { t: 'ptt', ok: 0, why: 'busy' }); return; }
+      a.talk = Date.now(); ws.serializeAttachment(a); this.send(ws, { t: 'ptt', ok: 1 });
+      const out = JSON.stringify({ t: 'rx', i: a.id, on: 1 }); for (const s of this.chan(a.ch)) if (s !== ws) this.send(s, out);
+      return;
+    }
     if (m.t === 'horn') { const out = JSON.stringify({ t: 'horn', i: a.id }); for (const s of this.others(ws)) this.send(s, out); return; }
     if (m.t === 'chat') {
       const now = Date.now(); if (now - (a.chatT || 0) < 2000) return;   // one message every 2 s
@@ -78,5 +103,5 @@ export class World {
   }
   webSocketClose(ws) { this.bye(ws); }
   webSocketError(ws) { this.bye(ws); }
-  bye(ws) { const a = ws.deserializeAttachment(); if (!a) return; const out = JSON.stringify({ t: 'leave', i: a.id }); for (const s of this.others(ws)) this.send(s, out); try { ws.close(); } catch (e) {} }
+  bye(ws) { const a = ws.deserializeAttachment(); if (!a) return; this.stopTalk(ws, a); const out = JSON.stringify({ t: 'leave', i: a.id }); for (const s of this.others(ws)) this.send(s, out); try { ws.close(); } catch (e) {} }
 }
