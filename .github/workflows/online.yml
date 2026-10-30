@@ -37,3 +37,16 @@ jobs:
           git config user.name "github-actions"; git config user.email "actions@github.com"
           git add online.json
           git diff --cached --quiet || (git commit -m "Online server address [skip ci]" && git push)
+      - name: Smoke test (count + WebSocket hello)
+        if: steps.sec.outputs.ok == 'yes'
+        run: |
+          sleep 5
+          WS=$(python3 -c "import json;print(json.load(open('online/../online.json'))['ws'])")
+          HTTP=${WS/wss:/https:}; curl -sf "${HTTP%/ws}/count"; echo
+          cat > /tmp/t.mjs <<'JS'
+          const ws=new WebSocket(process.argv[2]+'?w=1');const t=setTimeout(()=>{console.log('::error::no welcome');process.exit(1)},10000);
+          ws.onopen=()=>ws.send(JSON.stringify({t:'hi',name:'smoke'}));
+          ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.t==='welcome'){console.log('::notice::server OK, welcome id '+m.i+', max '+m.max);clearTimeout(t);ws.close();process.exit(0)}};
+          ws.onerror=e=>{console.log('::error::ws error');process.exit(1)};
+          JS
+          node /tmp/t.mjs "$WS"
