@@ -2241,6 +2241,78 @@ async function loadGLB(url,track){
     tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.anisotropy=4;tex.needsUpdate=true;}
   return{g,tex};
 }
+// minimal loader for a single skinned, textured mesh GLB (plain, no extensions) -> {root, mesh, bones:{name:bone}}
+async function parseSkinnedGLB(ab,T){
+  const dv=new DataView(ab);if(dv.getUint32(0,true)!==0x46546C67)throw new Error('not a GLB');
+  const jl=dv.getUint32(12,true),j=JSON.parse(new TextDecoder().decode(new Uint8Array(ab,20,jl))),bo=20+jl+8;
+  const NC={SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16},CT={5126:Float32Array,5125:Uint32Array,5123:Uint16Array,5121:Uint8Array};
+  const acc=i=>{const a=j.accessors[i],v=j.bufferViews[a.bufferView],C=CT[a.componentType],o=bo+(v.byteOffset||0)+(a.byteOffset||0);return new C(ab.slice(o,o+a.count*NC[a.type]*C.BYTES_PER_ELEMENT));};
+  const nodes=j.nodes.map(n=>{const o=('mesh' in n)?null:new T.Bone();if(o){o.name=n.name;if(n.translation)o.position.fromArray(n.translation);if(n.rotation)o.quaternion.fromArray(n.rotation);if(n.scale)o.scale.fromArray(n.scale);}return o;});
+  j.nodes.forEach((n,i)=>{(n.children||[]).forEach(c=>{if(nodes[i]&&nodes[c])nodes[i].add(nodes[c]);});});
+  const root=new T.Group();const sceneRoots=j.scenes[j.scene||0].nodes;
+  const meshNode=j.nodes.findIndex(n=>'mesh' in n);
+  const p=j.meshes[0].primitives[0],g=new T.BufferGeometry();
+  g.setAttribute('position',new T.BufferAttribute(acc(p.attributes.POSITION),3));g.setAttribute('normal',new T.BufferAttribute(acc(p.attributes.NORMAL),3));
+  g.setAttribute('uv',new T.BufferAttribute(acc(p.attributes.TEXCOORD_0),2));
+  g.setAttribute('skinIndex',new T.BufferAttribute(acc(p.attributes.JOINTS_0),4));g.setAttribute('skinWeight',new T.BufferAttribute(acc(p.attributes.WEIGHTS_0),4));
+  g.setIndex(new T.BufferAttribute(acc(p.indices),1));
+  const im=j.images[0],iv=j.bufferViews[im.bufferView];const img=await createImageBitmap(new Blob([new Uint8Array(ab,bo+(iv.byteOffset||0),iv.byteLength)],{type:im.mimeType}));
+  const tex=new T.Texture(img);tex.flipY=false;tex.encoding=T.sRGBEncoding;tex.needsUpdate=true;
+  const mat=new T.MeshStandardMaterial({map:tex,roughness:0.9,metalness:0});
+  const mesh=new T.SkinnedMesh(g,mat);mesh.frustumCulled=false;
+  // scene roots: an armature group holding the mesh and the bone root
+  sceneRoots.forEach(r=>{const n=j.nodes[r];const grp=new T.Group();if(n.translation)grp.position.fromArray(n.translation);if(n.rotation)grp.quaternion.fromArray(n.rotation);if(n.scale)grp.scale.fromArray(n.scale);
+    (n.children||[]).forEach(c=>{if(c===meshNode)grp.add(mesh);else if(nodes[c])grp.add(nodes[c]);});root.add(grp);});
+  root.updateMatrixWorld(true);
+  const sk=j.skins[0],ibm=acc(sk.inverseBindMatrices),bones=sk.joints.map(i=>nodes[i]),inv=bones.map((b,k)=>new T.Matrix4().fromArray(ibm,k*16));
+  mesh.bind(new T.Skeleton(bones,inv),mesh.matrixWorld);
+  const byName={};bones.forEach(b=>byName[b.name]=b);
+  return {root,mesh,bones:byName,list:bones};
+}
+// procedural clips for the Tripo rig (model faces +x, up +y, right +z). Each pose rotates bones about model-space axes,
+// converted into each bone's parent frame from the rest pose, so the same numbers work whatever the rig's local axes are.
+function makeManClips(M,T){
+  const D=Math.PI/180,rest={},pw={};
+  M.root.updateMatrixWorld(true);
+  for(const n in M.bones){const b=M.bones[n];rest[n]={q:b.quaternion.clone(),p:b.position.clone()};const q=new T.Quaternion();if(b.parent)b.parent.getWorldQuaternion(q);pw[n]=q;}
+  const AX={x:new T.Vector3(1,0,0),y:new T.Vector3(0,1,0),z:new T.Vector3(0,0,1)},_q=new T.Quaternion(),_r=new T.Quaternion();
+  // rots: list of [axis, degrees] applied in order (model space) -> local quaternion
+  const local=(n,rots)=>{const R=new T.Quaternion();for(const [a,d] of rots){_r.setFromAxisAngle(AX[a],d*D);R.premultiply(_r);}
+    const P=pw[n],Pi=P.clone().invert();return Pi.multiply(R).multiply(P).multiply(rest[n].q);};
+  const clip=(name,dur,fps,poseAt)=>{const N=Math.round(dur*fps)+1,times=new Float32Array(N),tr={};
+    for(let k=0;k<N;k++){const t=k/(N-1);times[k]=t*dur;const pose=poseAt(t*2*Math.PI,t);
+      for(const n in pose.r){if(!M.bones[n])continue;(tr[n]=tr[n]||[]).push(...local(n,pose.r[n]).toArray());}
+      if(pose.root){(tr.__root=tr.__root||[]).push(rest.BoneRoot.p.x+pose.root[0],rest.BoneRoot.p.y+pose.root[1],rest.BoneRoot.p.z+pose.root[2]);}}
+    const tracks=[];for(const n in tr){if(n==='__root')tracks.push(new T.VectorKeyframeTrack('BoneRoot.position',times,tr[n]));else tracks.push(new T.QuaternionKeyframeTrack(n+'.quaternion',times,tr[n]));}
+    return new T.AnimationClip(name,dur,tracks);};
+  const S=Math.sin,Cc=Math.cos;
+  const gait=(w,legA,kneeA,armA,elbow,lean,bob,twist)=>({
+    r:{L_Thigh:[['z',legA*S(w)]],R_Thigh:[['z',-legA*S(w)]],
+       L_Calf:[['z',-kneeA*Math.max(0,-Cc(w-0.6))-6]],R_Calf:[['z',-kneeA*Math.max(0,Cc(w-0.6))-6]],
+       L_Foot:[['z',8*S(w)]],R_Foot:[['z',-8*S(w)]],
+       L_Upperarm:[['x',-7],['z',-armA*S(w)]],R_Upperarm:[['x',7],['z',armA*S(w)]],
+       L_Forearm:[['z',elbow+elbow*0.6*Math.max(0,-S(w))]],R_Forearm:[['z',elbow+elbow*0.6*Math.max(0,S(w))]],
+       Hip:[['y',twist*S(w)]],Spine01:[['z',-lean*0.5],['y',-twist*1.4*S(w)]],Spine02:[['z',-lean*0.5]],Head:[['z',lean*0.6]]},
+    root:[0,-bob*0.5+bob*Math.abs(Cc(w)),0]});
+  const clips={
+    idle:clip('idle',3,10,w=>({r:{Spine02:[['z',-1.2*S(w)]],Head:[['z',1*S(w)],['y',4*S(w*0.5)]],L_Upperarm:[['x',-5],['z',1.5*S(w)]],R_Upperarm:[['x',5],['z',1.5*S(w)]],L_Forearm:[['z',8]],R_Forearm:[['z',8]]},root:[0,-0.003*S(w),0]})),
+    walk:clip('walk',1.0,24,w=>gait(w,24,42,16,12,3,0.012,5)),
+    run:clip('run',0.62,24,w=>gait(w,42,85,38,70,12,0.03,8)),
+    sit_floor:clip('sit_floor',3,10,w=>({r:{
+      L_Thigh:[['z',84],['y',48]],R_Thigh:[['z',84],['y',-48]],L_Calf:[['z',-148],['x',-18]],R_Calf:[['z',-148],['x',18]],L_Foot:[['z',-20]],R_Foot:[['z',-20]],
+      L_Upperarm:[['x',-14],['z',24]],R_Upperarm:[['x',14],['z',24]],L_Forearm:[['z',40],['y',15]],R_Forearm:[['z',40],['y',-15]],
+      Spine01:[['z',4]],Spine02:[['z',3-1*S(w)]],Head:[['z',-4]]},root:[0,-0.43,0]}))};
+  return clips;
+}
+
+/* the main character (models/man.glb: the owner's model, slimmed to 9k triangles, 1024 texture); falls back to the procedural shaib */
+const MAN={g:null,ok:false};
+fetch('models/man.glb').then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer();}).then(ab=>parseSkinnedGLB(ab,T)).then(M=>{
+  const g=new T.Group();M.root.rotation.y=-Math.PI/2;M.root.scale.setScalar(1.75);g.add(M.root);   // model faces +x and is 1 unit tall
+  M.mesh.castShadow=true;M.mesh.receiveShadow=true;
+  const clips=makeManClips(M,T);g.userData.anim={mixer:new T.AnimationMixer(M.root),clips,current:null};AA.three.play(g,'idle',0);
+  g.visible=false;MAN.g=g;MAN.ok=true;window.__man_ok=1;}).catch(e=>console.warn('man.glb',e));
+function heroInst(){if(MAN.ok)return MAN.g;const b=getBuilt('shaib',{seed:121,stoop:0,beard:0.45,grey:0,bisht:'none'}),g=AA.three.instance(b);g.children.forEach(o=>{if(o.name==='wood')o.visible=false;});return g;}
 const CAR_LEN=5.5;
 // published page: geometry as JSON + JPEG texture (the host does not serve .glb); repo build: the .glb itself
 async function loadCarJSON(name){
@@ -2419,12 +2491,12 @@ function ksBuild(){
   add('coffee_set',{dallahs:1,cups:4,dates:true},pad,[-0.45,0.012,0.25],-PI/2,3.0);
   add('ks_markaa',{},pad,[0.82,0,-0.5],PI/2,3.3);add('ks_markaa',{},pad,[0.82,0,0.5],PI/2,3.55);
   // the driver: a young Najdi man in thobe and shemagh
-  const m=ksInst('shaib',{seed:121,stoop:0,beard:0.45,grey:0,bisht:'none'});m.g.children.forEach(o=>{if(o.name==='wood')o.visible=false;});root.add(m.g);   // no canem.g.visible=false;
+  const m={g:heroInst()};root.add(m.g);m.g.position.set(0,0,0);m.g.visible=false;
   const door=W(-3.1,0.35),seat=W(-0.4,-0.5);
   Object.assign(KS,{grp:root,items,fire,man:m.g,door,seat,yawU,x:cx,z:cz,y:hc,plane,clip:null});
   if(fire.b.meta&&fire.b.meta.light)KS.light={g:fire.g,L:fire.b.meta.light,ph:1.3};
   return true;}
-function ksClear(){if(KS.grp){scene.remove(KS.grp);}if(KS.light){const i=lightSrc.indexOf(KS.light);if(i>=0)lightSrc.splice(i,1);env.near=null;envU._t=0;}
+function ksClear(){if(KS.grp){if(KS.man&&KS.man.parent===KS.grp)KS.grp.remove(KS.man);scene.remove(KS.grp);}if(KS.light){const i=lightSrc.indexOf(KS.light);if(i>=0)lightSrc.splice(i,1);env.near=null;envU._t=0;}
   Object.assign(KS,{st:'off',t:0,grp:null,items:[],man:null,light:null});ksBtn.classList.remove('on');ksBtn.setAttribute('aria-pressed','false');}
 function ksStart(){if(KS.st!=='off'||game.mode!=='play'||PH.on||FOOT.st!=='off')return;KS.st='stop';ksBtn.classList.add('on');ksBtn.setAttribute('aria-pressed','true');}
 function ksLeave(fast){if(KS.st==='stop'){ksClear();return;}if(KS.st==='out'||KS.st==='camp'){KS.st='pack';KS.spd=fast?3.2:2;}}
@@ -2451,7 +2523,7 @@ function stepKashta(dt){
   g.position.set(px,H(px,pz)*(1-onRug)+(KS.y+0.03+(KS.plane(-0.4,-0.5)-KS.y))*onRug,pz);
   if(walking){const want=KS.st==='pack'?Math.atan2(KS.door[0]-KS.seat[0],KS.door[1]-KS.seat[1]):Math.atan2(KS.seat[0]-KS.door[0],KS.seat[1]-KS.door[1]);g.rotation.y=want;ksPlay('walk');}
   else{let dh=KS.yawU-g.rotation.y;dh=Math.atan2(Math.sin(dh),Math.cos(dh));g.rotation.y+=dh*Math.min(1,dt*5);ksPlay(t>4.1?'sit_floor':'idle',0.35);}
-  if(g.userData.anim)g.userData.anim.mixer.update(dt*(walking?1.45:1));}
+  if(g.userData.anim)g.userData.anim.mixer.update(dt*(walking?(MAN.ok?1.2:1.45):1));}
 function kashtaCam(dt){if(KS.camW<=0.001||!KS.grp)return;const w=KS.camW*KS.camW*(3-2*KS.camW);
   const lx=KS.x+(S.x-KS.x)*0.3,lz=KS.z+(S.z-KS.z)*0.3;
   _kq.set(KS.x+Math.sin(KS.ca)*8.2,KS.y+4.2,KS.z+Math.cos(KS.ca)*8.2);const gy=H(_kq.x,_kq.z)+1.6;if(_kq.y<gy)_kq.y=gy;
@@ -2472,7 +2544,7 @@ function footOut(){if(FOOT.st!=='off'||game.mode!=='play'||PH.on)return;
   if(KS.st!=='off'){showToast('شيل الكشتة أول',1.8);return;}
   FOOT.st='stop';footBtn.classList.add('on');footBtn.setAttribute('aria-pressed','true');}
 function footBegin(){
-  if(!FOOT.g){const b=getBuilt('shaib',{seed:121,stoop:0,beard:0.45,grey:0,bisht:'none'});FOOT.g=AA.three.instance(b);FOOT.g.children.forEach(o=>{if(o.name==='wood')o.visible=false;});scene.add(FOOT.g);}
+  if(!FOOT.g||(MAN.ok&&FOOT.g!==MAN.g))FOOT.g=heroInst();scene.add(FOOT.g);
   const sd=[1,-1].find(k=>{const x=S.x+Math.cos(S.h)*1.75*k,z=S.z-Math.sin(S.h)*1.75*k;return !footBlockedAt(x,z);})||1;   // driver door (left) first
   FOOT.x=S.x+Math.cos(S.h)*1.75*sd+Math.sin(S.h)*0.3;FOOT.z=S.z-Math.sin(S.h)*1.75*sd+Math.cos(S.h)*0.3;FOOT.y=H(FOOT.x,FOOT.z);
   FOOT.h=S.h+PI/2*sd;FOOT.cyaw=S.h;FOOT.sp=0;FOOT.px=FOOT.x;FOOT.pz=FOOT.z;FOOT.g.visible=true;FOOT.clip=null;FOOT.st='on';
@@ -2505,7 +2577,8 @@ function stepFoot(dt){
         stamp(FOOT.x+rx-fx,FOOT.z+rz-fz,FOOT.x+rx+fx,FOOT.z+rz+fz,0.07,0.5);}}}
   FOOT.y+=(H(FOOT.x,FOOT.z)-FOOT.y)*Math.min(1,dt*14);
   FOOT.g.position.set(FOOT.x,FOOT.y-0.02,FOOT.z);FOOT.g.rotation.y=FOOT.h;
-  if(FOOT.sp>0.15)footPlay('walk',Math.min(3,FOOT.sp/(FOOT.sp>2.5?1.3:1.05)));else footPlay('idle',1);
+  const hasRun=!!(FOOT.g.userData.anim&&FOOT.g.userData.anim.clips.run);
+  if(FOOT.sp>0.15){if(hasRun)FOOT.sp>2.6?footPlay('run',FOOT.sp/3.5):footPlay('walk',Math.max(0.5,FOOT.sp/1.33));else footPlay('walk',Math.min(3,FOOT.sp/(FOOT.sp>2.5?1.3:1.05)));}else footPlay('idle',1);
   if(FOOT.g.userData.anim)FOOT.g.userData.anim.mixer.update(dt);
   {const near=Math.hypot(FOOT.x-S.x,FOOT.z-S.z)<4.5;if(near===ftInBtn.hidden)ftInBtn.hidden=!near;}   // a big 'get in' button appears beside the car
   // the camera swings round behind him while he walks
