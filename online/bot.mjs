@@ -3,7 +3,7 @@
 const WS = process.argv[2], MINUTES = +process.argv[3] || 15, NAME = 'كلود 🤖';
 const ws = new WebSocket(WS + '?w=1');
 const P = new Map();               // id -> {n, d, t}
-let me = null, x = 0, z = 0, h = 0, v = 0, target = null, towing = null, towT = 0, said = {}, started = Date.now();
+let stuckT = 0, war = true, bogT = 0, rkCool = 6, rkFly = null, me = null, x = 0, z = 0, h = 0, v = 0, target = null, towing = null, towT = 0, said = {}, started = Date.now();
 const send = o => { if (ws.readyState === 1) ws.send(typeof o === 'string' ? o : JSON.stringify(o)); };
 const Q = []; setInterval(() => { if (Q.length) send({ t: 'chat', m: Q.shift() }); }, 2300);   // the server takes one message every 2 s
 const say = (m, key) => { if (key && said[key] && Date.now() - said[key] < 20000) return; if (key) said[key] = Date.now(); if (Q.length < 3) Q.push(m); };
@@ -24,10 +24,11 @@ ws.onmessage = e => {
     if (/سلام/.test(t)) say('وعليكم السلام ورحمة الله 🌙', 'salam');
     else if (/كلود|ذيبان/.test(t)) say('سم! معك 👀', 'name');
     else if (/تعال|الحق|اتبع/.test(t)) say('جايك… 🏁', 'come');
-    else if (/صاروخ/.test(t)) say('لا تغرزني الله يخليك 😅', 'rk');
+    else if (/صاروخ|حارب|حرب|قاتل|اضرب/.test(t)) { war = true; say('أبشر بالحرب 😈🚀', 'war'); }
+    else if (/خلاص|هدنة|بس|وقف/.test(t)) { war = false; say('هدنة 🤝', 'peace'); }
     else if (/كشت|قهو/.test(t)) say('أنا جاي للقهوة ☕', 'coffee');
   }
-  if (m.t === 'hit') { if (m.to === me) say('آخ! غرّزتني يا ' + m.n + ' 😂', 'hitme'); else if (m.i !== me) say('ضربة معلم 🎯', 'hit'); }
+  if (m.t === 'hit') { if (m.to === me) { bogT = 7; say('آخ! غرّزتني يا ' + m.n + ' 😂 بردها لك', 'hitme'); } else if (m.i === me) say(['خذ 🚀😂', 'غرّزتك! شغّل الدبل 😏', 'ثلاث صفر 😎'][Math.floor(Math.random() * 3)], 'mine'); else if (m.i !== me) say('ضربة معلم 🎯', 'hit'); }
   if (m.t === 'rk' && m.to === me) say('شايف الصاروخ! 😳', 'rkme');
   if (m.t === 'tow' && m.ok) say('ولا يهمك، الفزعة واجب 💪', 'towok');
 };
@@ -38,12 +39,16 @@ setInterval(() => {
   // pick the first real player we hear from
   if (!target || !P.get(target) || Date.now() - P.get(target).t > 15000) { target = null; for (const [id, p] of P) if (p.d && Date.now() - p.t < 15000) { target = id; break; } }
   let tx = x, tz = z, want = 0;
+  if (bogT > 0) { bogT -= DT; v *= 0.8; send({ t: 's', d: [x, z, h, Math.abs(v), 0, 0, 0, 0, 0, 0, 1] }); return; }   // bogged by his rocket: stuck for a moment
+  rkCool -= DT;
   const p = target && P.get(target);
   if (p && p.d) {
     const [px, pz, ph] = p.d, stuck = p.d[10] === 1, onFoot = p.d[4] !== 0, ks = p.d[9] !== 0;
     const fx = Math.sin(ph), fz = Math.cos(ph);
     if (Math.hypot(px - x, pz - z) > 220) { x = px - fx * 30; z = pz - fz * 30; h = ph; v = 0; }   // far away: turn up just behind him
-    if (stuck && !onFoot) {   // park our rear at his nose, facing away, then drive off to pull
+    stuckT = stuck ? stuckT + DT : 0;
+    if (stuck && !onFoot && war && stuckT < 14 && towing !== target) { want = 0; say('شغّل الدبل وطلّع نفسك 😏 وإلا جيتك بعد شوي', 'wait'); }   // at war: give him a chance to dig out with 4x4 first
+    else if (stuck && !onFoot) {   // park our rear at his nose, facing away, then drive off to pull
       const ax = px + fx * 2.6, az = pz + fz * 2.6, gx = ax + fx * 6.5, gz = az + fz * 6.5;
       if (towing !== target) {
         say(p.n + ' مغرّز؟ جايك أسحبك 🪢', 'stuck');
@@ -52,14 +57,19 @@ setInterval(() => {
       } else { towT += DT; want = 3; tx = x + fx * 10; tz = z + fz * 10; if (towT > 12) { send({ t: 'tow', to: target, on: 0 }); towing = null; } }
     } else {
       if (towing) { towing = null; }
-      // follow: a point 14 m behind him (or 10 m to the side when he camps or walks)
-      const back = ks || onFoot ? 0 : 14, side = ks || onFoot ? 10 : 4;
+      const dist = Math.hypot(px - x, pz - z);
+      if (war && !onFoot && !ks && rkCool <= 0 && dist > 12 && dist < 100 && !rkFly) {   // fire
+        send({ t: 'rk', to: target }); rkCool = 9 + Math.random() * 4; rkFly = { to: target, t: 0.45 + 0.5 + dist / 32 };
+      }
+      // follow: a point 14 m behind him (or 10 m to the side when he camps or walks); at war, circle him 35 m off
+      const back = ks || onFoot ? 0 : (war ? 0 : 14), side = ks || onFoot ? 10 : (war ? 35 : 4);
       tx = px - fx * back + Math.cos(ph) * side; tz = pz - fz * back - Math.sin(ph) * side;
       const d = Math.hypot(tx - x, tz - z); want = d < 2 ? 0 : Math.min(26, d * 0.9);
       if (d < 20 && !said.near) { said.near = Date.now(); send({ t: 'horn' }); }
       if (ks) say('كشتة! أنا جاي للقهوة ☕', 'ks');
     }
   } else { want = 6; tx = x + Math.sin(h + 0.3) * 10; tz = z + Math.cos(h + 0.3) * 10; }   // nobody here: cruise round
+  if (rkFly) { rkFly.t -= DT; if (rkFly.t <= 0) { const q = P.get(rkFly.to); if (q && q.d && q.d[4] === 0) send({ t: 'hit', to: rkFly.to }); rkFly = null; } }
   // simple car: turn towards the goal, ease the speed
   if (want > 0.2) { const th = Math.atan2(tx - x, tz - z); let dh = th - h; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); h += Math.max(-1.6 * DT, Math.min(1.6 * DT, dh)); }
   v += (want - v) * Math.min(1, DT * 1.5); x += Math.sin(h) * v * DT; z += Math.cos(h) * v * DT;
