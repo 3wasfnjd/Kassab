@@ -76,6 +76,9 @@ body.menuopen.online #chatBtn{display:grid;animation:mnIn .18s ease-out both}
 #hornBtn{position:fixed;right:calc(18px + 96px + 12px + 7px + 52px + 10px + env(safe-area-inset-right,0px));bottom:calc(20px + 66px + 14px + env(safe-area-inset-bottom,0px));width:48px;height:48px;display:none}
 body.online #hornBtn{display:grid}body.title #hornBtn,body.photo #hornBtn,body.foot #hornBtn{display:none!important}
 body.uihide #hornBtn{opacity:.14}
+#rkBtn{position:fixed;right:calc(18px + 96px + 12px + 7px + 52px + 10px + 48px + 10px + env(safe-area-inset-right,0px));bottom:calc(20px + 66px + 14px + env(safe-area-inset-bottom,0px));width:52px;height:52px;display:none;color:#ffd0c4;border-color:rgba(255,120,90,.7)}
+body.online #rkBtn{display:grid}body.title #rkBtn,body.photo #rkBtn,body.foot #rkBtn{display:none!important}body.uihide #rkBtn{opacity:.14}
+#rkBtn.cool{opacity:.4}#rkBtn.cool svg{animation:none}
 #chatLog{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));top:calc(240px + env(safe-area-inset-top,0px));width:min(300px,46vw);direction:rtl;pointer-events:none;font:700 13px var(--font);color:#fff;z-index:5}
 #chatLog div{background:rgba(40,26,12,.55);border-radius:10px;padding:4px 9px;margin-bottom:5px;text-shadow:0 1px 2px #000;transition:opacity .6s;word-break:break-word}
 #chatLog b{color:#ffcf8a;font-weight:800}
@@ -280,6 +283,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <div id="radPanel" hidden><div class="rt">الكينود <span id="radState">مقفل</span></div><div id="radCh"></div><div class="rn">اضغط مطوّل على زر الكينود وتكلم — كل قناة يتكلم فيها واحد بس</div></div>
 <button id="pttBtn" aria-label="اضغط وتكلم"><span class="ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="15" rx="2"/><path d="M10 7V2M10 12h4M10 15.5h4"/></svg></span><b id="pttCh">١</b></button>
 <div id="rxLbl"></div>
+<button id="rkBtn" class="btn" aria-label="صاروخ تغريز"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4.5c2.5-1 4.6-1.1 5-.9.3.4.1 2.5-.9 5L13 14.2 9.8 11z"/><path d="M9.8 11l-3.3.6-2 2 3.4.8M13 14.2l-.6 3.3-2 2-.8-3.4"/><path d="M7.5 16.5c-1.4.4-2.6 1.6-3 3 1.4-.4 2.6-1.6 3-3z" fill="currentColor"/></svg></button>
 <div id="netCount" aria-label="عدد اللاعبين"></div>
 <div id="chatLog" aria-live="polite"></div>
 <div id="chatBar" hidden><input id="chatIn" maxlength="120" placeholder="اكتب رسالة…" dir="auto" autocomplete="off" enterkeyhint="send"><button id="chatSend">إرسال</button><button id="chatMute" aria-label="إخفاء رسائل الناس">🔕</button><button id="chatX" aria-label="إغلاق">✕</button></div>
@@ -2755,15 +2759,16 @@ document.addEventListener('visibilitychange',()=>{if(!NET.url)return;if(document
 addEventListener('pagehide',()=>{if(NET.ws)try{NET.ws.close();}catch(e){}});
 setInterval(()=>{if(NET.ws&&NET.ws.readyState===1)NET.ws.send('ping');},3000);   // keep-alive the server answers by itself (free); 8 s of silence means gone
 function netSend(o){if(NET.ws&&NET.ws.readyState===1)NET.ws.send(typeof o==='string'?o:JSON.stringify(o));}
-function netBadge(){const el=document.getElementById('netCount');if(!el)return;el.innerHTML=NET.ws&&NET.id?'<i>'+AR_N(NET.peers.size+1)+'</i>أونلاين':'';}
+function netBadge(){const el=document.getElementById('netCount');if(!el)return;el.innerHTML=NET.ws&&NET.id?'<i>'+AR_N(NET.peers.size+1)+'</i>أونلاين'+(RK.score?' · ⭐'+AR_N(RK.score):''):'';}
 function netMsg(m){
-  if(m.t==='welcome'){NET.id=m.i;document.body.classList.add('online');{const c=+(lsGet('kassab_ch')||0);if(c)radSetCh(c);}(m.players||[]).forEach(p=>{const pr=netPeer(p.i,p.n);pr.carId=p.c;if(p.d)netPush(pr,p.d);});netBadge();showToast('دخلت الأونلاين — '+AR_N(NET.peers.size+1)+' بالعالم',2.2);}
+  if(m.t==='welcome'){NET.id=m.i;document.body.classList.add('online');{const c=+(lsGet('kassab_ch')||0);if(c)radSetCh(c);}(m.players||[]).forEach(p=>{const pr=netPeer(p.i,p.n);pr.carId=p.c;pr.score=p.s||0;if(p.d)netPush(pr,p.d);});netBadge();showToast('دخلت الأونلاين — '+AR_N(NET.peers.size+1)+' بالعالم',2.2);}
   else if(m.t==='join'){netPeer(m.i,m.n).carId=m.c;netBadge();chatLine(null,m.n+' دخل العالم');}
   else if(m.t==='leave'){const p=NET.peers.get(m.i);if(p){netDrop(p);NET.peers.delete(m.i);netBadge();chatLine(null,p.name+' طلع');}}
   else if(m.t==='s'){const p=NET.peers.get(m.i)||netPeer(m.i,'…');netPush(p,m.d);}
   else if(m.t==='ptt'){if(m.ok&&!RAD.want){netSend({t:'ptt',on:false});return;}if(m.ok)radStartTx();else if(!m.ok){if(RAD.tx||RAD.want){radUp();showToast(m.why==='busy'?'القناة مشغولة — أحد يتكلم':'خلص وقت الكلام',1.6);}}}
   else if(m.t==='rx'){radRx(m.i,!!m.on);}
   else if(m.t==='tow'){ptow(m);}
+  else if(m.t==='rk'||m.t==='hit'){rkMsg(m);}
   else if(m.t==='horn'){const p=NET.peers.get(m.i);if(p&&p.cur){const d=Math.hypot(p.cur[0]-FOC.x,p.cur[1]-FOC.z);if(d<160)hornSound(Math.max(0.05,1-d/160));}}
   else if(m.t==='chat'){if(m.i===NET.id){chatLine(m.n,m.m,true);return;}if(NET.muted)return;chatLine(m.n,m.m);const p=NET.peers.get(m.i);if(p)peerBubble(p,m.m);}}
 // ---- peers
@@ -2798,11 +2803,11 @@ function stepNet(dt){
   const ft=FOOT.st==='on',ks=(KS.st==='out'||KS.st==='camp')?KS.side:0,d=[S.x,S.z,S.h,Math.hypot(S.vx,S.vz),ft?(FOOT.sit?2:1):0,ft?FOOT.x:0,ft?FOOT.z:0,ft?FOOT.h:0,ft?FOOT.sp:0,ks,((S.sink||0)>0.7&&Math.hypot(S.vx,S.vz)<1.2&&!ft)?1:0];
   const moved=!NET.last||Math.abs(d[0]-NET.last[0])+Math.abs(d[1]-NET.last[1])+Math.abs(d[2]-NET.last[2])*3+Math.abs(d[5]-NET.last[5])+Math.abs(d[6]-NET.last[6])+Math.abs(d[4]-NET.last[4])+Math.abs(d[9]-NET.last[9])+Math.abs(d[10]-NET.last[10])>0.03;
   if(NET.sendT<=0&&(moved||NET.idleT<=0)){netSend({t:'s',d});NET.last=d;NET.sendT=0.125;NET.idleT=2;}else NET.idleT-=rdt;
-  stepPT(dt);
+  stepPT(dt);stepRK(dt);
   // draw the others ~180 ms in the past, between two received states
   const now=performance.now()/1000-0.18;
   NET.obs.length=0;
-  {const t0=performance.now()/1000;NET.peers.forEach((p,id)=>{const lb=p.buf[p.buf.length-1];if(lb&&t0-lb.t>10){netDrop(p);NET.peers.delete(id);netBadge();}});}
+  if(!window.__noStale){const t0=performance.now()/1000;NET.peers.forEach((p,id)=>{const lb=p.buf[p.buf.length-1];if(lb&&t0-lb.t>10){netDrop(p);NET.peers.delete(id);netBadge();}});}
   NET.peers.forEach(p=>{const b=p.buf;if(!b.length)return;let a=b[0],c=b[b.length-1],k=1;
     for(let i=0;i<b.length-1;i++)if(b[i].t<=now&&b[i+1].t>=now){a=b[i];c=b[i+1];k=(now-a.t)/Math.max(1e-3,c.t-a.t);break;}
     if(now<b[0].t){a=c=b[0];k=0;}
@@ -2913,6 +2918,77 @@ function stepPT(dt){
     if(L>20){netSend({t:'tow',to:PT.peer,on:0});ptEnd();showToast('انقطع الحبل',2);return;}
     if(PT.pulled>6&&(S.sink||0)<0.15){netSend({t:'tow',to:PT.peer,on:0,ok:1});ptEnd();showToast('انسحبت — تسلم يالذيب',2.6);return;}}
   const r=ptRope(),A=new T.Vector3(a[0],H(a[0],a[1])+0.7,a[1]),B=new T.Vector3(b[0],H(b[0],b[1])+0.75,b[1]);r.position.copy(A);r.lookAt(B);r.scale.set(1,1,A.distanceTo(B));}
+/* ---------------- «صاروخ التغريز»: a roof cannon rises, a homing rocket goes for the nearest player's car,
+   a hit bogs that car down and scores a point. The rocket is the playful rocket of Aboden-Assets
+   (weapons, AB-W-010: red body, cream nose, three blue fins, flickering flame, grey smoke), at car scale */
+const RK={list:[],cool:0,tur:null,turK:0,hold:0,pend:null,score:0};
+const RK_MAT={body:new T.MeshStandardMaterial({color:0xe8473c,roughness:0.45}),nose:new T.MeshStandardMaterial({color:0xf4efe6,roughness:0.5}),fin:new T.MeshStandardMaterial({color:0x3a6fd8,roughness:0.5}),
+  dark:new T.MeshStandardMaterial({color:0x2c2a28,roughness:0.6,metalness:0.4}),steel:new T.MeshStandardMaterial({color:0x6d6a66,roughness:0.4,metalness:0.6})};
+const RK_GEO=(()=>{const b=new T.CylinderGeometry(0.12,0.12,0.77,12);b.rotateX(PI/2);const n=new T.ConeGeometry(0.12,0.32,12);n.rotateX(PI/2);n.translate(0,0,0.385+0.16);
+  const f=new T.BoxGeometry(0.028,0.2,0.24);return {b,n,f};})();
+function makeRocket(){const g=new T.Group();g.add(new T.Mesh(RK_GEO.b,RK_MAT.body),new T.Mesh(RK_GEO.n,RK_MAT.nose));
+  for(let i=0;i<3;i++){const a=i*Math.PI*2/3,f=new T.Mesh(RK_GEO.f,RK_MAT.fin);f.position.set(Math.cos(a)*0.17,Math.sin(a)*0.17,-0.3);f.rotation.z=a-PI/2;g.add(f);}
+  const fl=glowSprite(0xffcf6a,1.1);fl.material.opacity=0.95;fl.position.z=-0.55;g.add(fl);g.userData.fl=fl;g.traverse(o=>{if(o.isMesh)o.castShadow=true;});scene.add(g);return g;}
+function makeTurret(){const g=new T.Group(),base=new T.Mesh(new T.CylinderGeometry(0.24,0.28,0.14,14),RK_MAT.dark),yaw=new T.Group(),head=new T.Mesh(new T.BoxGeometry(0.36,0.22,0.4),RK_MAT.dark);
+  base.position.y=0.07;head.position.y=0.25;yaw.add(head);const pitch=new T.Group();pitch.position.y=0.27;yaw.add(pitch);
+  const tube=new T.Mesh(new T.CylinderGeometry(0.085,0.085,0.95,12),RK_MAT.steel);tube.rotation.x=PI/2;tube.position.z=0.45;pitch.add(tube);
+  const ring=new T.Mesh(new T.CylinderGeometry(0.1,0.1,0.1,12),RK_MAT.body);ring.rotation.x=PI/2;ring.position.z=0.88;pitch.add(ring);
+  g.add(base,yaw);g.userData={yaw,pitch};g.visible=false;g.traverse(o=>{if(o.isMesh)o.castShadow=true;});return g;}
+function roofY(m){if(!m||!m.userData.bb)return 1.9;const bb=m.userData.bb;return (bb.max.y-bb.min.y)*m.userData.k-0.05;}
+function rkSound(kind,v){if(!snd.ctx)return;const c=snd.ctx,t=c.currentTime,len=kind==='boom'?1.1:0.6,b=c.createBuffer(1,c.sampleRate*len,c.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++){const k=i/d.length;d[i]=(Math.random()*2-1)*(kind==='boom'?Math.pow(1-k,2.2):Math.sin(k*Math.PI));}
+  const n=c.createBufferSource();n.buffer=b;const f=c.createBiquadFilter();f.type=kind==='boom'?'lowpass':'bandpass';f.frequency.setValueAtTime(kind==='boom'?900:600,t);f.frequency.exponentialRampToValueAtTime(kind==='boom'?120:2400,t+len);
+  const g=c.createGain();g.gain.value=(kind==='boom'?0.9:0.35)*v;n.connect(f);f.connect(g);g.connect(snd.out||c.destination);n.start(t);}
+function rkBoom(x,y,z){puff(x,z,26,3.2);for(let i=0;i<40;i++){const a=Math.random()*6.28,u=Math.random()*9;emitSpray(x,y+0.5,z,Math.cos(a)*u,3+Math.random()*7,Math.sin(a)*u);}
+  for(let i=0;i<14;i++)emitDust(x+(Math.random()-0.5)*2,y+0.6,z+(Math.random()-0.5)*2,(Math.random()-0.5)*4,2+Math.random()*3,(Math.random()-0.5)*4,2,7,3,0.5);
+  const fl=glowSprite(0xffa040,7);fl.material.opacity=1;fl.position.set(x,y+1,z);scene.add(fl);let k=1;const fade=()=>{k-=0.08;fl.material.opacity=Math.max(0,k);if(k>0)requestAnimationFrame(fade);else scene.remove(fl);};fade();
+  const d=Math.hypot(x-FOC.x,z-FOC.z);if(d<150)rkSound('boom',Math.max(0.15,1-d/150));}
+function rkTargetPos(to){if(to===NET.id)return [S.x,S.y+1,S.z];const p=NET.peers.get(to);if(!p||!p.cur)return null;return [p.cur[0],H(p.cur[0],p.cur[1])+1,p.cur[1]];}
+function rkPick(){let best=null,bs=1e9;const fx=Math.sin(S.h),fz=Math.cos(S.h);
+  NET.peers.forEach(p=>{if(!p.cur||!p.buf.length||!p.car.visible)return;const dx=p.cur[0]-S.x,dz=p.cur[1]-S.z,d=Math.hypot(dx,dz);if(d>110||d<3)return;const facing=(dx*fx+dz*fz)/d,sc=d*(1.6-facing);if(sc<bs){bs=sc;best=p;}});return best;}
+function rkFire(){if(!NET.ws||!NET.id||FOOT.st!=='off'||KS.st!=='off')return;
+  if(RK.cool>0){showToast('المدفع يتعبّى…',1);return;}
+  const tgt=rkPick();if(!tgt){showToast('ما فيه سيارة قريبة تنضرب',1.6);return;}
+  RK.cool=6;RK.pend={to:tgt.id,t:0.45};RK.hold=2.2;netSend({t:'rk',to:tgt.id});document.getElementById('rkBtn').classList.add('cool');}
+// a turret on a car group: rises out of the roof, turns to the target, and sinks back
+function turStep(T0,carG,carH,mesh,tpos,dt,up){if(!T0)return;T0.k=Math.max(0,Math.min(1,(T0.k||0)+(up?dt*2.6:-dt*1.6)));const g=T0.g;g.visible=T0.k>0.01;
+  g.position.set(0,roofY(mesh)-0.42*(1-T0.k),-0.25);if(tpos){const dx=tpos[0]-carG.position.x,dz=tpos[2]-carG.position.z;let yw=Math.atan2(dx,dz)-carH;g.userData.yaw.rotation.y+=Math.atan2(Math.sin(yw-g.userData.yaw.rotation.y),Math.cos(yw-g.userData.yaw.rotation.y))*Math.min(1,dt*8);g.userData.pitch.rotation.x=-0.28;}}
+function turMuzzle(T0){const v=new T.Vector3(0,0,0.95);T0.g.userData.pitch.localToWorld(v);const d=new T.Vector3(0,0,1).transformDirection(T0.g.userData.pitch.matrixWorld);return {p:v,d};}
+function rkLaunch(T0,to,own,from){T0.g.updateWorldMatrix(true,true);const m=turMuzzle(T0),g=makeRocket(),sp=12;
+  RK.list.push({g,to,own,from,x:m.p.x,y:m.p.y,z:m.p.z,vx:m.d.x*sp,vy:m.d.y*sp+3,vz:m.d.z*sp,t:0,done:false});
+  puff(m.p.x,m.p.z,6,0.8);const d=Math.hypot(m.p.x-FOC.x,m.p.z-FOC.z);if(d<140)rkSound('whoosh',Math.max(0.15,1-d/140));}
+function stepRK(dt){
+  RK.cool=Math.max(0,RK.cool-dt);if(RK.cool===0)document.getElementById('rkBtn').classList.remove('cool');
+  // my roof cannon
+  if(!RK.tur&&(RK.pend||RK.hold>0)){RK.tur={g:makeTurret(),k:0};body.add(RK.tur.g);}
+  if(RK.tur){if(RK.tur.g.parent!==body)body.add(RK.tur.g);RK.hold=Math.max(0,RK.hold-dt);const tp=RK.pend?rkTargetPos(RK.pend.to):null;
+    turStep(RK.tur,car,S.h,window.__carModel,tp,dt,RK.hold>0);
+    if(RK.pend){RK.pend.t-=dt;if(RK.pend.t<=0&&RK.tur.k>0.9){rkLaunch(RK.tur,RK.pend.to,true,NET.id);RK.pend=null;}}}
+  // the others' cannons
+  NET.peers.forEach(p=>{if(!p.tur)return;p.tur.hold=Math.max(0,p.tur.hold-dt);turStep(p.tur,p.car,p.carH||0,p.carMesh,rkTargetPos(p.tur.to),dt,p.tur.hold>0);
+    if(p.tur.pend>0){p.tur.pend-=dt;if(p.tur.pend<=0&&p.tur.k>0.8)rkLaunch(p.tur,p.tur.to,false,p.id);}});
+  // rockets in the air: speed up, turn after their target, smoke behind
+  for(const r of RK.list){if(r.done)continue;r.t+=dt;const tp=rkTargetPos(r.to);
+    const sp=Math.min(42,12+r.t*55);let vx=r.vx,vy=r.vy,vz=r.vz;const l=Math.hypot(vx,vy,vz)||1;vx/=l;vy/=l;vz/=l;
+    if(tp&&r.t>0.15){let dx=tp[0]-r.x,dy=tp[1]-r.y,dz=tp[2]-r.z;const dl=Math.hypot(dx,dy,dz)||1;dx/=dl;dy/=dl;dz/=dl;const k=Math.min(1,3.6*dt);vx+=(dx-vx)*k;vy+=(dy-vy)*k;vz+=(dz-vz)*k;
+      const nl=Math.hypot(vx,vy,vz)||1;vx/=nl;vy/=nl;vz/=nl;
+      r.dl=dl;if(dl<2.4){r.done=true;rkBoom(r.x,r.y-1,r.z);if(r.own)netSend({t:'hit',to:r.to});continue;}
+      if(dl>8){const ah=H(r.x+vx*3,r.z+vz*3);if(r.y+vy*3<ah+1.6){vy+=0.5*Math.min(1,dt*8);const nl2=Math.hypot(vx,vy,vz);vx/=nl2;vy/=nl2;vz/=nl2;}}}   // hop over the dunes on the way
+    r.vx=vx*sp;r.vy=vy*sp;r.vz=vz*sp;r.x+=r.vx*dt;r.y+=r.vy*dt;r.z+=r.vz*dt;
+    const gy=H(r.x,r.z);if(r.y<gy+0.3||r.t>5.5){r.done=true;rkBoom(r.x,Math.max(gy,r.y-0.5),r.z);if(r.own&&r.dl!=null&&r.dl<6)netSend({t:'hit',to:r.to});continue;}   // close enough: the blast still bogs it
+    r.g.position.set(r.x,r.y,r.z);r.g.lookAt(r.x+r.vx,r.y+r.vy,r.z+r.vz);r.g.userData.fl.scale.setScalar(0.9+Math.random()*0.5);
+    if(Math.random()<0.9)emitDust(r.x-vx*0.6,r.y-vy*0.6,r.z-vz*0.6,(Math.random()-0.5)*0.6,0.6+Math.random()*0.6,(Math.random()-0.5)*0.6,0.7,2.6,1.6,0.35);}
+  for(let i=RK.list.length-1;i>=0;i--)if(RK.list[i].done){scene.remove(RK.list[i].g);RK.list.splice(i,1);}}
+function rkMsg(m){
+  if(m.t==='rk'){const p=NET.peers.get(m.i);if(!p)return;if(!p.tur){p.tur={g:makeTurret(),k:0,hold:0};p.car.add(p.tur.g);}p.tur.to=m.to;p.tur.hold=2.2;p.tur.pend=0.45;
+    if(m.to===NET.id)showToast('🚀 '+p.name+' أطلق عليك صاروخ!',1.6);}
+  else if(m.t==='hit'){const fromRocket=RK.list.find(r=>!r.done&&r.from===m.i);if(fromRocket){fromRocket.done=true;}
+    const tp=rkTargetPos(m.to);if(tp&&!(m.i===NET.id))rkBoom(tp[0],tp[1]-1,tp[2]);
+    if(m.to===NET.id){S.sink=1;S.vx*=0.15;S.vz*=0.15;S.toldStuck=true;showToast('💥 '+m.n+' غرّزك بصاروخ! شغّل الدبل أو اطلب سحب',3);}
+    if(m.i===NET.id){RK.score=m.s;showToast('⭐ +١ — غرّزت '+m.tn,2.2);}
+    const p=NET.peers.get(m.i);if(p)p.score=m.s;chatLine(null,'🚀 '+m.n+' غرّز '+m.tn+' ('+AR_N(m.s)+')');netBadge();}}
+document.getElementById('rkBtn').addEventListener('pointerdown',e=>{e.preventDefault();rkFire();});
+addEventListener('keydown',e=>{if(e.code==='KeyF'&&document.activeElement.tagName!=='INPUT')rkFire();});
 // ---- horn and chat
 function hornSound(v){if(!snd.ctx)return;const c=snd.ctx,t=c.currentTime,g=c.createGain(),lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;g.gain.setValueAtTime(0,t);
   g.gain.linearRampToValueAtTime(0.22*v,t+0.03);g.gain.setValueAtTime(0.22*v,t+0.42);g.gain.linearRampToValueAtTime(0,t+0.55);lp.connect(g);g.connect(snd.out||c.destination);
@@ -2965,7 +3041,7 @@ function frame(now){
 }
 // test hook: advance simulation deterministically without rAF timing
 window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){if(frozen()){updateVisual(DT);continue;}readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
-window.__world={CRIT,KS,FOOT,FOC,NET,get PT(){return PT;},footOut,footIn,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();if(FOOT.st!=='off')footCancel();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
+window.__world={CRIT,KS,FOOT,FOC,NET,RK,rkFire,get PT(){return PT;},footOut,footIn,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();if(FOOT.st!=='off')footCancel();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
 window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
 })();

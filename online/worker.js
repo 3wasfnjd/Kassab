@@ -40,7 +40,7 @@ export class World {
     const [client, server] = Object.values(new WebSocketPair());
     const id = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
     this.state.acceptWebSocket(server);
-    server.serializeAttachment({ id, name: '', car: 'gmc', d: null, chatT: 0, ch: 0, talk: 0, seen: Date.now() });
+    server.serializeAttachment({ id, name: '', car: 'gmc', d: null, chatT: 0, ch: 0, talk: 0, seen: Date.now(), score: 0, rkT: 0, hitT: 0 });
     if (!(await this.state.storage.getAlarm())) await this.state.storage.setAlarm(Date.now() + STALE_CHECK);
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -67,7 +67,7 @@ export class World {
       a.name = clean(m.name, 16) || ('كساب ' + a.id.slice(0, 3));
       a.car = /^[a-z0-9_]{1,16}$/.test(m.car || '') ? m.car : 'gmc';
       ws.serializeAttachment(a);
-      const players = this.others(ws).map(s => s.deserializeAttachment()).filter(p => p && p.name).map(p => ({ i: p.id, n: p.name, c: p.car, d: p.d }));
+      const players = this.others(ws).map(s => s.deserializeAttachment()).filter(p => p && p.name).map(p => ({ i: p.id, n: p.name, c: p.car, d: p.d, s: p.score || 0 }));
       this.send(ws, { t: 'welcome', i: a.id, n: a.name, players, max: MAX });
       const j = JSON.stringify({ t: 'join', i: a.id, n: a.name, c: a.car });
       for (const s of this.others(ws)) this.send(s, j);
@@ -97,6 +97,22 @@ export class World {
     if (m.t === 'tow' && typeof m.to === 'string') {   // rope between two players: passed to the other one only
       const out = JSON.stringify({ t: 'tow', i: a.id, on: m.on ? 1 : 0, ok: m.ok ? 1 : 0 });
       for (const s of this.others(ws)) { const b = s.deserializeAttachment(); if (b && b.id === m.to) this.send(s, out); }
+      return;
+    }
+    // «صاروخ التغريز»: the shooter's game flies the homing rocket and reports the hit; the server keeps the score
+    if (m.t === 'rk') {
+      const now = Date.now(); if (now - (a.rkT || 0) < 4000) return;   // one rocket every 4 s
+      a.rkT = now; ws.serializeAttachment(a);
+      const out = JSON.stringify({ t: 'rk', i: a.id, to: String(m.to || '') }); for (const s of this.others(ws)) this.send(s, out);
+      return;
+    }
+    if (m.t === 'hit' && typeof m.to === 'string') {
+      const now = Date.now(); if (now - (a.rkT || 0) > 9000 || now - (a.hitT || 0) < 3000) return;   // only a rocket fired lately, one hit per rocket
+      const tgt = this.others(ws).find(s => (s.deserializeAttachment() || {}).id === m.to); if (!tgt) return;
+      a.hitT = now; a.score = (a.score || 0) + 1; ws.serializeAttachment(a);
+      const tn = tgt.deserializeAttachment().name;
+      const out = JSON.stringify({ t: 'hit', i: a.id, n: a.name, to: m.to, tn, s: a.score });
+      for (const s of this.state.getWebSockets()) this.send(s, out);
       return;
     }
     if (m.t === 'horn') { const out = JSON.stringify({ t: 'horn', i: a.id }); for (const s of this.others(ws)) this.send(s, out); return; }
