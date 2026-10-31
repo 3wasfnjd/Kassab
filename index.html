@@ -132,6 +132,10 @@ body.title #menuBtn,body.photo #menuBtn{display:none!important}
   border:1.5px solid #ffb35c;background:rgba(58,40,22,.78);color:#ffb35c;font:800 17px var(--font);touch-action:manipulation}
 #ftSit{position:fixed;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(180px + env(safe-area-inset-bottom,0px));height:46px;padding:0 22px;border-radius:23px;
   border:1.5px solid #ffb35c;background:rgba(58,40,22,.78);color:#ffb35c;font:800 17px var(--font);touch-action:manipulation}
+#ftRide{position:fixed;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(236px + env(safe-area-inset-bottom,0px));height:46px;padding:0 20px;border-radius:23px;max-width:60vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  border:1.5px solid #7fc8ff;background:rgba(22,40,58,.8);color:#bfe3ff;font:800 16px var(--font);touch-action:manipulation}
+body.ride #ftRide{bottom:calc(124px + env(safe-area-inset-bottom,0px))}
+body.ride #ftStick,body.ride #ftRun,body.ride #ftIn,body.ride #ftSit,body.ride #ftLook{display:none!important}
 #ftRun.on{background:var(--glass-hi);border-color:#ffb35c;color:#ffb35c}
 body.foot .pads,body.foot #steer,body.foot #awd,body.foot .hud,body.foot #ksBtn{display:none!important}
 body.photo #footUI,body.photo #footBtn{display:none!important}
@@ -276,7 +280,7 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
 <button id="menuBtn" aria-label="القائمة" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
 <button id="ksBtn" aria-label="كشتة" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1.6 2.4 4 4.1 4 7.2a4 4 0 0 1-8 0c0-1.4.6-2.4 1.5-3.3.2 1.3.9 2 1.7 2.3C11 7.3 11.2 5 12 3z"/><path d="M4 20.5l16-4M4 16.5l16 4"/></svg></button>
 <button id="footBtn" aria-label="انزل تمشّى" aria-pressed="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="M10.5 21l1.8-6.2L15 17v4M9 12.5l1.6-4.3 3.4 1.2 2 3M12.3 14.8l.9-5.6"/></svg></button>
-<div id="footUI"><div id="ftLook"></div><div id="ftStick"><div id="ftKnob"></div></div><button id="ftRun" aria-label="ركض">ركض</button><button id="ftIn" aria-label="اركب السيارة" hidden>اركب</button><button id="ftSit" aria-label="اجلس في الكشتة" hidden>اجلس</button></div>
+<div id="footUI"><div id="ftLook"></div><div id="ftStick"><div id="ftKnob"></div></div><button id="ftRun" aria-label="ركض">ركض</button><button id="ftIn" aria-label="اركب السيارة" hidden>اركب</button><button id="ftSit" aria-label="اجلس في الكشتة" hidden>اجلس</button><button id="ftRide" aria-label="اركب مع اللاعب" hidden>اركب معه</button></div>
 <button id="chatBtn" aria-label="الدردشة"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg></button>
 <button id="hornBtn" class="btn" aria-label="بوري"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h3l6 4V6L6 10z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg></button>
 <button id="radBtn" aria-label="الكينود"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="15" rx="2"/><path d="M10 7V2M10 12h4M10 15.5h4"/></svg></button>
@@ -2647,7 +2651,7 @@ function kashtaCam(dt){if(KS.camW<=0.001||!KS.grp)return;const w=KS.camW*KS.camW
   _kq.set(KS.x+Math.sin(KS.ca)*8.2,KS.y+4.2,KS.z+Math.cos(KS.ca)*8.2);const gy=H(_kq.x,_kq.z)+1.6;if(_kq.y<gy)_kq.y=gy;
   _kl.copy(camState.look).lerp(_p.set(lx,KS.y+0.6,lz),w);camera.position.lerp(_kq,w);camera.lookAt(_kl);}
 /* ---------------- on foot: the driver gets out and walks the world; the car waits where he left it ---------------- */
-const footBtn=document.getElementById('footBtn'),ftInBtn=document.getElementById('ftIn'),ftSitBtn=document.getElementById('ftSit'),_fwq=new T.Vector3(),_ftl=new T.Vector3();
+const footBtn=document.getElementById('footBtn'),ftInBtn=document.getElementById('ftIn'),ftSitBtn=document.getElementById('ftSit'),ftRideBtn=document.getElementById('ftRide'),_fwq=new T.Vector3(),_ftl=new T.Vector3();
 function footBlockedAt(x,z){return waterY(x,z)>H(x,z)+0.6;}
 function footCollide(){const r=0.32;
   for(const c of staticC){const dx=FOOT.x-c.x,dz=FOOT.z-c.z,d=Math.hypot(dx,dz),m=c.r+r;if(d<m&&d>1e-4){FOOT.x+=dx/d*(m-d);FOOT.z+=dz/d*(m-d);}}
@@ -2668,11 +2672,12 @@ function footBegin(){
   FOOT.x=S.x+Math.cos(S.h)*1.75*sd+Math.sin(S.h)*0.3;FOOT.z=S.z-Math.sin(S.h)*1.75*sd+Math.cos(S.h)*0.3;FOOT.y=H(FOOT.x,FOOT.z);
   FOOT.h=S.h+PI/2*sd;FOOT.cyaw=S.h;FOOT.sp=0;FOOT.px=FOOT.x;FOOT.pz=FOOT.z;FOOT.g.visible=true;FOOT.clip=null;FOOT.st='on';
   document.body.classList.add('foot');showToast('تمشّى بالدائرة يسار، واسحب يمين الشاشة تلف الكاميرا',2.8);}
-function footIn(){if(FOOT.sit)footStand();const d=Math.hypot(FOOT.x-S.x,FOOT.z-S.z);
+function footIn(){if(FOOT.ride)rideEnd();if(FOOT.sit)footStand();const d=Math.hypot(FOOT.x-S.x,FOOT.z-S.z);
   if(d>4.5){const m=Math.round(d);showToast('ارجع للسيارة عشان تركب — تبعد '+m.toLocaleString('ar-SA')+' م',2.4);return;}
-  FOOT.st='off';FOOT.g.visible=false;ftInBtn.hidden=true;ftSitBtn.hidden=true;document.body.classList.remove('foot');footBtn.classList.remove('on');footBtn.setAttribute('aria-pressed','false');FOOT.stick.x=FOOT.stick.y=0;FOOT.run=false;camState.init=false;resize();}
+  FOOT.st='off';FOOT.g.visible=false;ftInBtn.hidden=true;ftSitBtn.hidden=true;ftRideBtn.hidden=true;document.body.classList.remove('foot');footBtn.classList.remove('on');footBtn.setAttribute('aria-pressed','false');FOOT.stick.x=FOOT.stick.y=0;FOOT.run=false;camState.init=false;resize();}
 function footCancel(){if(FOOT.st==='off')return;if(FOOT.st==='on'){FOOT.x=S.x;FOOT.z=S.z;}footIn();if(FOOT.st!=='off'){FOOT.st='off';footBtn.classList.remove('on');}}
 ftInBtn.addEventListener('click',()=>{if(FOOT.st==='on')footIn();});
+ftRideBtn.addEventListener('click',()=>{if(FOOT.st!=='on')return;if(FOOT.ride)rideEnd();else if(FOOT.rideCand)rideStart(FOOT.rideCand);});
 ftSitBtn.addEventListener('click',()=>{if(FOOT.st!=='on')return;if(FOOT.sit)footStand();else if(FOOT.seatCand)footSit(FOOT.seatCand);});
 footBtn.addEventListener('click',()=>{if(FOOT.st==='off')footOut();else if(FOOT.st==='stop'){FOOT.st='off';footBtn.classList.remove('on');}else footIn();});
 let heroTag=null;
@@ -2685,6 +2690,11 @@ function stepFoot(dt){
   if(FOOT.st==='off'){FOOT.camW=Math.max(0,FOOT.camW-dt*1.6);return;}
   if(FOOT.st==='stop'){if(Math.hypot(S.vx,S.vz)<0.6&&!S.air&&AAok)footBegin();else return;}
   FOOT.camW=Math.min(1,FOOT.camW+dt*1.4);
+  // riding with another player: just a passenger — the view follows his car, my own car waits where I left it
+  if(FOOT.ride){const p=NET.peers.get(FOOT.ride);if(!p||!p.cur||p.mode!==0||!NET.ws){rideEnd(true);return;}
+    FOOT.x=p.cur[0];FOOT.z=p.cur[1];FOOT.y=H(FOOT.x,FOOT.z);FOOT.h=p.carH||0;FOOT.sp=0;FOOT.g.visible=false;ftInBtn.hidden=true;ftSitBtn.hidden=true;return;}
+  {let rc=null,rd=3.8;NET.peers.forEach(p=>{if(!p.cur||p.mode!==0||!p.car.visible||(p.buf.length&&p.buf[p.buf.length-1].d[3]>3))return;const d=Math.hypot(FOOT.x-p.cur[0],FOOT.z-p.cur[1]);if(d<rd){rd=d;rc=p;}});
+    FOOT.rideCand=rc;const show=!!rc&&!FOOT.sit;if(ftRideBtn.hidden===show)ftRideBtn.hidden=!show;if(rc&&ftRideBtn.dataset.id!==rc.id){ftRideBtn.dataset.id=rc.id;ftRideBtn.textContent='اركب مع '+rc.name;}}
   // a free guest place at someone's kashta close by -> «اجلس»; sitting -> «قوم» (moving the stick also stands him up)
   if(FOOT.sit){const st=FOOT.sit;FOOT.x=st.x;FOOT.z=st.z;FOOT.y=st.y;FOOT.h=st.h;FOOT.sp=0;FOOT.g.position.set(st.x,st.y-0.02,st.z);FOOT.g.rotation.y=st.h;footPlay('sit_floor',1);
     if(FOOT.g.userData.anim)FOOT.g.userData.anim.mixer.update(dt);ftInBtn.hidden=true;
@@ -2713,6 +2723,10 @@ function stepFoot(dt){
   {const near=Math.hypot(FOOT.x-S.x,FOOT.z-S.z)<4.5;if(near===ftInBtn.hidden)ftInBtn.hidden=!near;}   // a big 'get in' button appears beside the car
   // the camera swings round behind him while he walks
   if(FOOT.sp>0.5&&!FOOT.look){let dh=FOOT.h-FOOT.cyaw;dh=Math.atan2(Math.sin(dh),Math.cos(dh));FOOT.cyaw+=dh*Math.min(1,dt*0.9*Math.min(1,FOOT.sp/1.7));}}
+function rideStart(p){if(!p)return;FOOT.ride=p.id;document.body.classList.add('ride');ftRideBtn.hidden=false;ftRideBtn.textContent='انزل';ftRideBtn.dataset.id='';netSend({t:'ride',to:p.id,on:1});showToast('ركبت مع '+p.name+' 🚗',2);}
+function rideEnd(lost){if(!FOOT.ride)return;const p=NET.peers.get(FOOT.ride);if(!lost)netSend({t:'ride',to:FOOT.ride,on:0});
+  if(p&&p.cur){const h=p.carH||0;FOOT.x=p.cur[0]+Math.cos(h)*2.1;FOOT.z=p.cur[1]-Math.sin(h)*2.1;FOOT.h=h+PI/2;}FOOT.y=H(FOOT.x,FOOT.z);
+  FOOT.ride=null;FOOT.g.visible=true;FOOT.clip=null;document.body.classList.remove('ride');ftRideBtn.hidden=true;ftRideBtn.dataset.id='';showToast(lost?'السواق راح — نزلت':'نزلت',1.6);}
 function footSeatNear(){let best=null,bd=2.4;
   NET.peers.forEach(p=>{if(!p.ks)return;p.ks.seats.forEach((st,i)=>{if(i===0)return;const d=Math.hypot(FOOT.x-st.x,FOOT.z-st.z);if(d>=bd)return;
     let taken=false;NET.peers.forEach(q=>{if(q.mode===2&&q.cur2&&Math.hypot(q.cur2[0]-st.x,q.cur2[1]-st.z)<0.45)taken=true;});if(!taken){bd=d;best=st;}});});
@@ -2720,7 +2734,9 @@ function footSeatNear(){let best=null,bd=2.4;
 function footSit(st){FOOT.sit=st;ftSitBtn.hidden=false;ftSitBtn.textContent='قوم';}
 function footStand(){if(!FOOT.sit)return;const st=FOOT.sit;FOOT.sit=null;FOOT.x=st.x-Math.sin(st.h)*0.9;FOOT.z=st.z-Math.cos(st.h)*0.9;FOOT.clip=null;ftSitBtn.textContent='اجلس';ftSitBtn.hidden=true;}
 function footCam(dt){heroTagStep();if(FOOT.camW<=0.001||!FOOT.g)return;const w=FOOT.camW*FOOT.camW*(3-2*FOOT.camW);
-  const cf=Math.sin(FOOT.cyaw),cz=Math.cos(FOOT.cyaw);_fwq.set(FOOT.x-cf*6.2,FOOT.y+3.4,FOOT.z-cz*6.2);const gy=H(_fwq.x,_fwq.z)+1.2;if(_fwq.y<gy)_fwq.y=gy;
+  if(FOOT.ride){let dh=FOOT.h-FOOT.cyaw;dh=Math.atan2(Math.sin(dh),Math.cos(dh));FOOT.cyaw+=dh*Math.min(1,dt*2.2);}
+  const cd=FOOT.ride?10:6.2,ch=FOOT.ride?5.2:3.4;
+  const cf=Math.sin(FOOT.cyaw),cz=Math.cos(FOOT.cyaw);_fwq.set(FOOT.x-cf*cd,FOOT.y+ch,FOOT.z-cz*cd);const gy=H(_fwq.x,_fwq.z)+1.2;if(_fwq.y<gy)_fwq.y=gy;
   _ftl.set(FOOT.x+cf*1.2,FOOT.y+1.1,FOOT.z+cz*1.2);
   camera.position.lerp(_fwq,w);_p.copy(camState.look).lerp(_ftl,w);camera.lookAt(_p);}
 // on-foot stick (left) and look-drag (right)
@@ -2768,6 +2784,7 @@ function netMsg(m){
   else if(m.t==='ptt'){if(m.ok&&!RAD.want){netSend({t:'ptt',on:false});return;}if(m.ok)radStartTx();else if(!m.ok){if(RAD.tx||RAD.want){radUp();showToast(m.why==='busy'?'القناة مشغولة — أحد يتكلم':'خلص وقت الكلام',1.6);}}}
   else if(m.t==='rx'){radRx(m.i,!!m.on);}
   else if(m.t==='tow'){ptow(m);}
+  else if(m.t==='ride'){showToast(m.on?('🚗 '+(m.n||'أحد')+' ركب معك'):((m.n||'أحد')+' نزل'),2);}
   else if(m.t==='rk'||m.t==='hit'){rkMsg(m);}
   else if(m.t==='horn'){const p=NET.peers.get(m.i);if(p&&p.cur){const d=Math.hypot(p.cur[0]-FOC.x,p.cur[1]-FOC.z);if(d<160)hornSound(Math.max(0.05,1-d/160));}}
   else if(m.t==='chat'){if(m.i===NET.id){chatLine(m.n,m.m,true);return;}if(NET.muted)return;chatLine(m.n,m.m);const p=NET.peers.get(m.i);if(p)peerBubble(p,m.m);}}
@@ -2800,7 +2817,7 @@ function stepNet(dt){
   if(!NET.ws||!NET.id){return;}
   // send our state: 8 times a second while something moves, every 2 s when still
   const rt=performance.now()/1000,rdt=Math.min(1,rt-(NET.rt||rt));NET.rt=rt;NET.sendT-=rdt;NET.pingT-=rdt;
-  const ft=FOOT.st==='on',ks=(KS.st==='out'||KS.st==='camp')?KS.side:0,d=[S.x,S.z,S.h,Math.hypot(S.vx,S.vz),ft?(FOOT.sit?2:1):0,ft?FOOT.x:0,ft?FOOT.z:0,ft?FOOT.h:0,ft?FOOT.sp:0,ks,((S.sink||0)>0.7&&Math.hypot(S.vx,S.vz)<1.2&&!ft)?1:0];
+  const ft=FOOT.st==='on',ks=(KS.st==='out'||KS.st==='camp')?KS.side:0,d=[S.x,S.z,S.h,Math.hypot(S.vx,S.vz),ft?(FOOT.ride?3:FOOT.sit?2:1):0,ft?FOOT.x:0,ft?FOOT.z:0,ft?FOOT.h:0,ft?FOOT.sp:0,ks,((S.sink||0)>0.7&&Math.hypot(S.vx,S.vz)<1.2&&!ft)?1:0];
   const moved=!NET.last||Math.abs(d[0]-NET.last[0])+Math.abs(d[1]-NET.last[1])+Math.abs(d[2]-NET.last[2])*3+Math.abs(d[5]-NET.last[5])+Math.abs(d[6]-NET.last[6])+Math.abs(d[4]-NET.last[4])+Math.abs(d[9]-NET.last[9])+Math.abs(d[10]-NET.last[10])>0.03;
   if(NET.sendT<=0&&(moved||NET.idleT<=0)){netSend({t:'s',d});NET.last=d;NET.sendT=0.125;NET.idleT=2;}else NET.idleT-=rdt;
   stepPT(dt);stepRK(dt);
@@ -2827,6 +2844,7 @@ function stepNet(dt){
       if(p.man){let sy=seated.y;if(sy==null){sy=H(seated.x,seated.z)+0.05;NET.peers.forEach(q=>{if(q.ks)q.ks.seats.forEach(st=>{if(Math.hypot(st.x-seated.x,st.z-seated.z)<0.3)sy=st.y;});});if(KS.set)KS.set.seats.forEach(st=>{if(Math.hypot(st.x-seated.x,st.z-seated.z)<0.3)sy=st.y;});}
         p.man.visible=!far;p.man.position.set(seated.x,sy-0.02,seated.z);p.man.rotation.y=seated.h;const an=p.man.userData.anim;if(an.name!=='sit_floor')AA.three.play(p.man,'sit_floor',0.3);if(an.current)an.current.timeScale=1;an.mixer.update(dt);
         tx=seated.x;tz=seated.z;ty=sy+1.6;}}
+    else if(p.mode===3){if(p.man)p.man.visible=false;tx=c.d[5];tz=c.d[6];ty=H(tx,tz)+3.4;}   // riding in someone's car: only the name shows, over that car
     else if(p.mode===1){if(!p.man){p.man=cloneMan(heroKey(p.carId||'gmc'));if(p.man)scene.add(p.man);}
       if(p.man){const mx=L(5),mz=L(6),mh=LA(7),sp=c.d[8];p.man.visible=!far;p.man.position.set(mx,H(mx,mz)-0.02,mz);p.man.rotation.y=mh;
         const an=p.man.userData.anim,cl=sp>2.6?'run':sp>0.15?'walk':heroIdle(heroKey(p.carId||'gmc'));if(an.name!==cl)AA.three.play(p.man,cl,0.2);if(an.current)an.current.timeScale=cl==='run'?sp/3.5:cl==='walk'?Math.max(0.5,sp/1.33):1;
