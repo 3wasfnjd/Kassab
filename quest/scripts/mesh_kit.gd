@@ -32,6 +32,23 @@ func tri(a: Vector3, b: Vector3, c: Vector3, col: Color, out_from = null) -> voi
 	cols.append_array([col, col, col])
 
 
+## A triangle with its own vertex normals (smooth curved surfaces); wound to face along `out`.
+func tri_n(a: Vector3, b: Vector3, c: Vector3, na: Vector3, nb: Vector3, nc: Vector3, col: Color) -> void:
+	a = xf * a
+	b = xf * b
+	c = xf * c
+	na = (xf.basis * na).normalized()
+	nb = (xf.basis * nb).normalized()
+	nc = (xf.basis * nc).normalized()
+	if (b - a).cross(c - a).dot(na + nb + nc) < 0.0:
+		verts.append_array([a, b, c])
+		norms.append_array([na, nb, nc])
+	else:
+		verts.append_array([a, c, b])
+		norms.append_array([na, nc, nb])
+	cols.append_array([col, col, col])
+
+
 func quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, col: Color, out_from = null) -> void:
 	tri(a, b, c, col, out_from)
 	tri(a, c, d, col, out_from)
@@ -133,19 +150,29 @@ func prism(pts: Array, z0: float, z1: float, col: Color, cap_col = null, basis :
 
 
 ## A cylinder along `axis` (wheels, lamps, pipes). r1 != r0 gives a cone or a taper.
-func cyl(center: Vector3, axis: Vector3, r0: float, r1: float, length: float, sides: int, col: Color, cap_col = null, caps := true) -> void:
+## smooth: the sides get round normals (tyres, lamps) instead of facets. `stripes` alternates
+## a darker colour every other side (tyre tread) without extra geometry.
+func cyl(center: Vector3, axis: Vector3, r0: float, r1: float, length: float, sides: int, col: Color, cap_col = null, caps := true, smooth := false, stripes = null) -> void:
 	var z := axis.normalized()
 	var x := (Vector3.UP if absf(z.y) < 0.9 else Vector3.RIGHT).cross(z).normalized()
 	var y := z.cross(x)
 	var a0 := center - z * length * 0.5
 	var a1 := center + z * length * 0.5
 	var capc: Color = col if cap_col == null else cap_col
+	var slope := (r0 - r1) / maxf(length, 1e-4)
 	for i in sides:
 		var t0 := TAU * i / sides
 		var t1 := TAU * (i + 1) / sides
 		var d0 := x * cos(t0) + y * sin(t0)
 		var d1 := x * cos(t1) + y * sin(t1)
-		quad(a0 + d0 * r0, a0 + d1 * r0, a1 + d1 * r1, a1 + d0 * r1, col, center)
+		var sc: Color = col if (stripes == null or i % 2 == 0) else stripes
+		if smooth:
+			var n0 := (d0 + z * slope).normalized()
+			var n1 := (d1 + z * slope).normalized()
+			tri_n(a0 + d0 * r0, a0 + d1 * r0, a1 + d1 * r1, n0, n1, n1, sc)
+			tri_n(a0 + d0 * r0, a1 + d1 * r1, a1 + d0 * r1, n0, n1, n0, sc)
+		else:
+			quad(a0 + d0 * r0, a0 + d1 * r0, a1 + d1 * r1, a1 + d0 * r1, sc, center)
 		if caps:
 			tri(a0, a0 + d0 * r0, a0 + d1 * r0, capc, center)
 			tri(a1, a1 + d1 * r1, a1 + d0 * r1, capc, center)

@@ -15,6 +15,10 @@ var wheels: Array[Node3D] = []      # [front-left, front-right, rear-left, rear-
 var spins: Array[Node3D] = []
 var steering_wheel: Node3D
 var speedo: Label3D
+var needle_kmh: Node3D
+var needle_rpm: Node3D
+var awd_lamp: MeshInstance3D
+var awd_mat: StandardMaterial3D
 var fuel: Label3D
 var lamps_mat: StandardMaterial3D
 var tail_mat: StandardMaterial3D
@@ -40,7 +44,7 @@ func _init(font: Font = null) -> void:
 	body_root = Node3D.new()
 	body_root.name = "Body"
 	add_child(body_root)
-	var mat := MeshKit.vc_material(0.62, 0.08)
+	var mat := MeshKit.vc_material(0.38, 0.22)   # painted metal: a soft sheen
 	var mat_matte := MeshKit.vc_material(0.9)
 	var k := MeshKit.new()
 	var km := MeshKit.new()      # matte parts (plastics, tyres, fabric)
@@ -79,7 +83,7 @@ func _init(font: Font = null) -> void:
 	var lk := MeshKit.new()
 	var tk := MeshKit.new()
 	for s in [-1.0, 1.0]:
-		lk.cyl(Vector3(s * 0.66, 1.0, 2.31), Vector3.FORWARD, 0.115, 0.115, 0.05, 14, Color.WHITE)
+		lk.cyl(Vector3(s * 0.66, 1.0, 2.31), Vector3.FORWARD, 0.115, 0.115, 0.05, 16, Color.WHITE, null, true, true)
 		tk.box(Vector3(s * 0.86, 1.02, -2.27), Vector3(0.12, 0.28, 0.05), Color.WHITE, 0.015)
 	var lmi := MeshInstance3D.new()
 	lmi.mesh = lk.commit(null, lamps_mat)
@@ -89,28 +93,29 @@ func _init(font: Font = null) -> void:
 	body_root.add_child(tmi)
 	_build_wheels()
 	_build_steering(mat_matte)
+	_build_gauges(mat_matte)
 	# speedo on the dash, in front of the driver (Arabic-Indic digits like a Gulf dash)
 	speedo = Label3D.new()
 	speedo.text = "0"
-	speedo.font_size = 64
-	speedo.pixel_size = 0.0011
+	speedo.font_size = 40
+	speedo.pixel_size = 0.0006
 	speedo.modulate = Color(1, 0.86, 0.55)
 	speedo.outline_size = 0
 	speedo.no_depth_test = false
 	speedo.double_sided = false
 	if font:
 		speedo.font = font
-	speedo.position = Vector3(0.42, 1.43, 0.47)
+	speedo.position = Vector3(0.335, 1.425, 0.425)
 	speedo.rotation = Vector3(-0.35, PI, 0)
 	body_root.add_child(speedo)
 	fuel = Label3D.new()
 	fuel.text = "2WD"
-	fuel.font_size = 32
+	fuel.font_size = 26
 	fuel.pixel_size = 0.0011
 	fuel.modulate = Color(0.6, 1, 0.65)
 	if font:
 		fuel.font = font
-	fuel.position = Vector3(0.42, 1.385, 0.475)
+	fuel.position = Vector3(0.42, 1.475, 0.445)
 	fuel.rotation = Vector3(-0.35, PI, 0)
 	body_root.add_child(fuel)
 
@@ -152,7 +157,7 @@ func _build_body(k: MeshKit, km: MeshKit) -> void:
 	for i in 6:
 		km.box(Vector3(0, 0.88 + i * 0.048, 2.245), Vector3(1.0, 0.018, 0.02), TRIM)
 	for s in [-1.0, 1.0]:
-		km.cyl(Vector3(s * 0.66, 1.0, 2.255), Vector3.FORWARD, 0.15, 0.15, 0.06, 16, CHROME)
+		km.cyl(Vector3(s * 0.66, 1.0, 2.255), Vector3.FORWARD, 0.15, 0.15, 0.06, 16, CHROME, null, true, true)
 		km.box(Vector3(s * 0.88, 1.0, 2.24), Vector3(0.1, 0.06, 0.03), Color(1, 0.6, 0.15), 0.01)
 	km.box(Vector3(0, 0.58, 2.29), Vector3(1.96, 0.24, 0.22), BLACK, 0.05)
 	km.box(Vector3(0, 0.6, 2.42), Vector3(0.46, 0.16, 0.12), TRIM, 0.02)
@@ -186,7 +191,7 @@ func _build_body(k: MeshKit, km: MeshKit) -> void:
 	for s in [-1.0, 1.0]:
 		km.box(Vector3(-0.3 + s * 0.17, 2.14, -0.35), Vector3(0.3, 0.04, 1.2), Color(0.95, 0.5, 0.1), 0.01)
 	# spare wheel on the back door
-	km.cyl(Vector3(-0.3, 1.18, -2.18), Vector3.BACK, 0.4, 0.4, 0.27, 16, TYRE)
+	km.cyl(Vector3(-0.3, 1.18, -2.18), Vector3.BACK, 0.4, 0.4, 0.27, 20, TYRE, Color(0.1, 0.095, 0.09), true, true, Color(0.17, 0.16, 0.15))
 	k.cyl(Vector3(-0.3, 1.18, -2.33), Vector3.BACK, 0.25, 0.22, 0.04, 12, PAINT)
 	# rear lamps' black housings and a ladder
 	for s in [-1.0, 1.0]:
@@ -267,21 +272,16 @@ func _build_wheels() -> void:
 		var t := MeshKit.new()
 		var r := MeshKit.new()
 		var side := 1.0 if left else -1.0
-		# tyre: a chunky drum with a rounded shoulder and tread blocks
-		t.cyl(Vector3.ZERO, Vector3.RIGHT, WR - 0.03, WR - 0.03, 0.3, 18, TYRE, TYRE)
-		t.cyl(Vector3(side * 0.16, 0, 0), Vector3.RIGHT, WR - 0.03, WR - 0.09, 0.03, 18, TYRE, null, false)
-		t.cyl(Vector3(-side * 0.16, 0, 0), Vector3.RIGHT, WR - 0.09, WR - 0.03, 0.03, 18, TYRE, null, false)
-		for b in 18:
-			var a := TAU * (b + 0.5) / 18.0
-			var d := Vector3(0, cos(a), sin(a))
-			t.box(d * (WR - 0.015), Vector3(0.26, 0.03, 0.09), Color(0.16, 0.155, 0.15), 0.0, Basis(Vector3.RIGHT, a))
+		# tyre: a round drum with a rounded shoulder; the tread is painted in alternating bands
+		t.cyl(Vector3.ZERO, Vector3.RIGHT, WR, WR, 0.26, 20, TYRE, Color(0.1, 0.095, 0.09), true, true, Color(0.17, 0.16, 0.15))
+		t.cyl(Vector3(side * 0.15, 0, 0), Vector3.RIGHT, WR, WR - 0.07, 0.04, 20, TYRE, null, false, true)
+		t.cyl(Vector3(-side * 0.15, 0, 0), Vector3.RIGHT, WR - 0.07, WR, 0.04, 20, TYRE, null, false, true)
 		# white steel rim with a hub and lug nuts, on the outer face
-		r.cyl(Vector3(side * 0.13, 0, 0), Vector3.RIGHT, 0.26, 0.26, 0.05, 14, RIM)
+		r.cyl(Vector3(side * 0.12, 0, 0), Vector3.RIGHT, 0.26, 0.25, 0.05, 16, RIM, null, true, true)
 		r.cyl(Vector3(side * 0.16, 0, 0), Vector3.RIGHT, 0.09, 0.07, 0.04, 10, Color(0.6, 0.6, 0.58))
 		for b in 6:
 			var a := TAU * b / 6.0
-			r.cyl(Vector3(side * 0.165, cos(a) * 0.16, sin(a) * 0.16), Vector3.RIGHT, 0.018, 0.018, 0.03, 6, Color(0.55, 0.55, 0.52))
-			r.box(Vector3(side * 0.158, cos(a + 0.52) * 0.19, sin(a + 0.52) * 0.19), Vector3(0.01, 0.05, 0.05), Color(0.8, 0.8, 0.76), 0.0, Basis(Vector3.RIGHT, a))
+			r.box(Vector3(side * 0.16, cos(a) * 0.16, sin(a) * 0.16), Vector3(0.03, 0.035, 0.035), Color(0.55, 0.55, 0.52))
 		var mi := MeshInstance3D.new()
 		var mesh := t.commit(null, tm)
 		r.commit(mesh, rm)
@@ -297,7 +297,7 @@ func _build_steering(mat: Material) -> void:
 	steering_wheel.rotation.x = -0.42
 	body_root.add_child(steering_wheel)
 	var s := MeshKit.new()
-	s.ring(Vector3.ZERO, Vector3.FORWARD, 0.19, 0.022, 20, 6, Color(0.1, 0.09, 0.085))
+	s.ring(Vector3.ZERO, Vector3.FORWARD, 0.19, 0.022, 18, 5, Color(0.1, 0.09, 0.085))
 	s.beam(Vector3(-0.18, 0, 0), Vector3(0.18, 0, 0), 0.05, 0.02, Color(0.15, 0.14, 0.13))
 	s.beam(Vector3(0, 0, 0), Vector3(0, -0.18, 0), 0.05, 0.02, Color(0.15, 0.14, 0.13))
 	s.cyl(Vector3(0, 0, -0.01), Vector3.FORWARD, 0.06, 0.06, 0.04, 10, Color(0.2, 0.19, 0.18))
@@ -310,3 +310,75 @@ func _build_steering(mat: Material) -> void:
 func set_lamps(night: float, brake: bool) -> void:
 	lamps_mat.emission_energy_multiplier = 0.25 + night * 3.0
 	tail_mat.emission_energy_multiplier = 0.25 + night * 1.2 + (2.5 if brake else 0.0)
+
+
+## Two round dials in the pod in front of the driver (speed 0-160 km/h, revs 0-6000) with
+## needles, and a green 4x4 lamp between them.
+func _build_gauges(mat: Material) -> void:
+	var face := MeshKit.new()
+	var ticks := MeshKit.new()
+	for c in [Vector3(0.335, 1.44, 0.43), Vector3(0.505, 1.44, 0.43)]:
+		var xf := Transform3D(Basis.from_euler(Vector3(-0.35, PI, 0)), c)
+		face.xf = xf
+		face.cyl(Vector3.ZERO, Vector3.BACK, 0.068, 0.068, 0.01, 20, Color(0.05, 0.05, 0.05), Color(0.05, 0.05, 0.05))
+		face.cyl(Vector3(0, 0, 0.006), Vector3.BACK, 0.072, 0.072, 0.012, 20, CHROME, null, false)
+		ticks.xf = xf
+		for i in 9:
+			var a := deg_to_rad(225.0 - i * 33.75)
+			var d := Vector3(cos(a), sin(a), 0)
+			ticks.box(d * 0.055 + Vector3(0, 0, 0.007), Vector3(0.004, 0.014, 0.002), Color(0.95, 0.92, 0.85), 0.0, Basis(Vector3.BACK, a - PI / 2))
+	var mi := MeshInstance3D.new()
+	mi.mesh = face.commit(null, mat)
+	body_root.add_child(mi)
+	var tm := StandardMaterial3D.new()
+	tm.vertex_color_use_as_albedo = true
+	tm.emission_enabled = true
+	tm.emission = Color(1, 0.9, 0.7)
+	tm.emission_energy_multiplier = 0.6
+	var ti := MeshInstance3D.new()
+	ti.mesh = ticks.commit(null, tm)
+	body_root.add_child(ti)
+	var nm := StandardMaterial3D.new()
+	nm.albedo_color = Color(1, 0.35, 0.15)
+	nm.emission_enabled = true
+	nm.emission = Color(1, 0.35, 0.15)
+	nm.emission_energy_multiplier = 0.8
+	var needles := []
+	for c in [Vector3(0.335, 1.44, 0.43), Vector3(0.505, 1.44, 0.43)]:
+		var holder := Node3D.new()
+		holder.position = c
+		holder.rotation = Vector3(-0.35, PI, 0)
+		body_root.add_child(holder)
+		var pivot := Node3D.new()
+		pivot.position = Vector3(0, 0, 0.009)
+		holder.add_child(pivot)
+		var nk := MeshKit.new()
+		nk.box(Vector3(0.024, 0, 0), Vector3(0.05, 0.004, 0.002), Color.WHITE)
+		var n := MeshInstance3D.new()
+		n.mesh = nk.commit(null, nm)
+		pivot.add_child(n)
+		needles.append(pivot)
+	needle_kmh = needles[0]
+	needle_rpm = needles[1]
+	awd_mat = StandardMaterial3D.new()
+	awd_mat.albedo_color = Color(0.1, 0.25, 0.12)
+	awd_mat.emission_enabled = true
+	awd_mat.emission = Color(0.3, 1.0, 0.4)
+	awd_mat.emission_energy_multiplier = 0.0
+	var lk := MeshKit.new()
+	lk.cyl(Vector3(0.42, 1.415, 0.432), Vector3.BACK, 0.011, 0.011, 0.006, 10, Color.WHITE)
+	awd_lamp = MeshInstance3D.new()
+	awd_lamp.mesh = lk.commit(null, awd_mat)
+	body_root.add_child(awd_lamp)
+
+
+func set_gauges(kmh: float, rpm: float, awd: bool) -> void:
+	needle_kmh.rotation.z = deg_to_rad(225.0 - clampf(kmh / 160.0, 0.0, 1.0) * 270.0)
+	needle_rpm.rotation.z = deg_to_rad(225.0 - clampf(rpm / 6000.0, 0.0, 1.0) * 270.0)
+	awd_mat.emission_energy_multiplier = 2.0 if awd else 0.0
+
+
+## Where the steering wheel sits in the world (centre, the axis it turns about, an "up" on its rim).
+func wheel_frame() -> Transform3D:
+	var p := steering_wheel.get_parent() as Node3D
+	return p.global_transform * Transform3D(Basis.from_euler(Vector3(steering_wheel.rotation.x, 0, 0)), steering_wheel.position)

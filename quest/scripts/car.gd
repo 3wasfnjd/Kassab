@@ -74,66 +74,69 @@ func _ground(x: float, z: float) -> float:
 	return terrain.height_at(x, z)
 
 
+var hand := false           # handbrake (right grip): the tail steps out for a drift
+var slip := 0.0
+var spin_k := 0.0
+var taut := false           # pulling something on a rope
+
+
+## Same driving model as the web Kassab (tuoos stepCar): strong pull, low top speed in 4x4,
+## grip that lets go once the car is sliding (drift), slopes pull the car down, a heavy truck in
+## the air that only real ramps launch, and bogging on soft sand when crawling without 4x4.
 func _step(dt: float, gas: float, brake: float, steer_in: float) -> void:
 	var f := fwd()
 	var s := side()
 	vF = vel.x * f.x + vel.z * f.z
 	vS = vel.x * s.x + vel.z * s.z
-	soft = terrain.soft_at(pos.x, pos.z)
-	steer = move_toward(steer, steer_in, dt * 3.2)
-	var grounded := not air
-	var bogk := 1.0 - sink * (0.35 if awd else 0.97)
-	var traction := (1.0 - 0.42 * soft * (0.35 if awd else 1.0)) * bogk if grounded else 0.0
-
-	if grounded:
-		if gas > 0.05:
-			if vF < -0.6:
-				vF = move_toward(vF, 0.0, BRAKE * dt * gas)
-			else:
-				vF += ACC * gas * traction * (1.0 - clampf(vF / VMAX, 0.0, 1.0)) * dt
-		if brake > 0.05:
-			if vF > 0.6:
-				vF = move_toward(vF, 0.0, BRAKE * brake * dt)
-			else:
-				vF = maxf(vF - 5.5 * brake * traction * dt, -VREV)
-		# rolling drag (more on soft sand), slope pull along the car
-		var drag := 0.06 + soft * 0.22 * (0.45 if awd else 1.0) + sink * 1.8
-		vF -= vF * drag * dt
-		if gas < 0.05 and brake < 0.05:
-			vF = move_toward(vF, 0.0, 0.8 * dt)
-		var hf := _ground(pos.x + f.x * 1.4, pos.z + f.z * 1.4)
-		var hr := _ground(pos.x - f.x * 1.4, pos.z - f.z * 1.4)
-		var slope := (hf - hr) / 2.8
-		vF -= G * 0.62 * slope / sqrt(1.0 + slope * slope) * dt
-		# lateral grip: the tail slides on sand at speed
-		var grip := lerpf(10.0, 3.2, soft) * (1.15 if awd else 1.0)
-		vS *= exp(-grip * dt)
-		# steering: less lock at speed, yaw from the bicycle model
-		var lock := 0.62 / (1.0 + absf(vF) / 16.0)
-		var ang := steer * lock
-		var target_rate := -vF * tan(ang) / CarModel.WB   # steer right (+) turns towards -X
-		yaw_rate = lerpf(yaw_rate, target_rate, 1.0 - exp(-8.0 * dt))
-		h += yaw_rate * dt
-		# bogging down: slow and on soft sand without 4x4
-		if soft > 0.35 and absf(vF) < 3.5 and (gas > 0.05 or absf(vF) < 0.5):
-			sink = minf(1.0, sink + dt * (0.03 if awd else 0.32) * soft * (1.0 if gas > 0.05 else 0.25))
-		elif absf(vF) > 8.0 or soft < 0.2:
+	steer = move_toward(steer, steer_in, dt * 4.0)
+	spin_k = 0.0
+	if not air:
+		soft = terrain.soft_at(pos.x, pos.z)
+		var crawl := (gas > 0.05 or (brake > 0.05 and vF < 0.5)) and absf(vF) < 7.0
+		if soft > 0.25 and crawl:
+			sink = minf(1.0, sink + dt * (0.04 if awd else 0.42) * soft)
+		elif absf(vF) > 9.0 or soft < 0.15:
 			sink = maxf(0.0, sink - dt * 0.5)
 		if awd and (gas > 0.05 or brake > 0.05):
-			sink = maxf(0.0, sink - dt * 0.24)
-		if sink > 0.8 and not awd and not stuck_told:
+			sink = maxf(0.0, sink - dt * 0.22)
+		var bog := 1.0 - sink * (0.35 if awd else 0.97)
+		if not awd and sink > 0.8 and not stuck_told:
 			stuck_told = true
 			events.append("stuck")
 		elif sink < 0.2:
 			stuck_told = false
+		if gas > 0.05:
+			var a := 15.0 * maxf(0.15, 1.0 - vF / (30.0 if awd else 58.0)) * (1.15 if awd else 1.0) * bog * gas   # ~120 km/h, slower in 4x4
+			vF += a * dt
+			if vF < 6.0:
+				spin_k = 1.0 - vF / 6.0
+		if brake > 0.05:
+			if vF > 0.5:
+				vF -= 22.0 * brake * dt
+			else:
+				vF = maxf(-11.0, vF - 7.0 * bog * brake * dt)
+		vF -= vF * sink * 2.2 * dt
+		vF -= vF * 0.18 * dt + signf(vF) * minf(absf(vF), (0.3 if gas > 0.05 else 1.8) * dt)
+		var grip := 1.1 if hand else (2.6 if absf(vS) > 3.5 else 5.5)
+		vS *= exp(-grip * dt)
+		if hand:
+			vF -= signf(vF) * minf(absf(vF), 3.2 * dt)
+		if taut:
+			vF *= 1.0 - 1.6 * dt
+		vel.x = f.x * vF + s.x * vS
+		vel.z = f.z * vF + s.z * vS
+		# gravity on slopes
+		var n := terrain.normal_at(pos.x, pos.z)
+		vel.x += n.x * 16.0 * dt
+		vel.z += n.z * 16.0 * dt
+		var sp := absf(vF)
+		var target := -steer * minf(1.0, sp / 5.0) * (2.1 - minf(1.1, sp * 0.03)) * (signf(vF) if absf(vF) > 0.01 else 1.0)
+		if hand:
+			target *= 1.55
+		yaw_rate += (target - yaw_rate) * minf(1.0, 7.0 * dt)
 	else:
-		yaw_rate *= exp(-1.5 * dt)
-		h += yaw_rate * dt
-
-	f = fwd()
-	s = side()
-	vel.x = f.x * vF + s.x * vS
-	vel.z = f.z * vF + s.z * vS
+		yaw_rate *= exp(-0.6 * dt)
+	h += yaw_rate * dt
 	pos.x += vel.x * dt
 	pos.z += vel.z * dt
 	# acacia trunks stop the car
@@ -144,50 +147,55 @@ func _step(dt: float, gas: float, brake: float, steer_in: float) -> void:
 			continue
 		var d := sqrt(dx * dx + dz * dz)
 		if d < 1.6 and d > 0.001:
-			var n := Vector3(dx / d, 0, dz / d)
-			pos.x += n.x * (1.6 - d)
-			pos.z += n.z * (1.6 - d)
-			var vn := vel.dot(n)
+			var nn := Vector3(dx / d, 0, dz / d)
+			pos.x += nn.x * (1.6 - d)
+			pos.z += nn.z * (1.6 - d)
+			var vn := vel.dot(nn)
 			if vn < 0.0:
 				if vn < -4.0:
 					events.append("crash")
-				vel -= n * vn * 1.4
+				vel -= nn * vn * 1.4
 				vel *= 0.6
-
-	# vertical: follow the ground, or fly off a crest when the ground falls away faster than gravity
-	var g := _ground(pos.x, pos.z)
+	var gy := terrain.height_at(pos.x, pos.z)
+	# heavy truck: strong gravity in the air, only real ramps launch it, the suspension soaks up most of the lift
 	if air:
-		air_t += dt
-		vy -= G * dt
+		vy -= 27.0 * dt
 		pos.y += vy * dt
-		pitch = lerpf(pitch, -0.12, dt * 0.8)
+		air_t += dt
+		pitch = lerpf(pitch, -0.1, dt * 0.8)
 		roll = lerpf(roll, 0.0, dt * 1.2)
-		if pos.y <= g:
-			landed = clampf(-vy / 12.0, 0.0, 1.0)
-			if landed > 0.25:
+		if pos.y <= gy:
+			var hard := -vy
+			landed = clampf(hard / 12.0, 0.0, 1.0)
+			if hard > 4.0 or air_t > 0.25:
 				events.append("land")
-			pos.y = g
-			vy = 0.0
+			pos.y = gy
 			air = false
-			vF *= 0.94
+			vy = 0.0
 	else:
-		var ballistic := pos.y + vy * dt - G * dt * dt
-		if g < ballistic - 0.04 and speed() > 7.0:
+		# look 1/60 s ahead (the web game's step): does the truck's momentum carry it clear of the ground?
+		var la := 1.0 / 60.0
+		var pred := pos.y + vy * la - 16.0 * la * la
+		var gnext := terrain.height_at(pos.x + vel.x * la, pos.z + vel.z * la)
+		if pred > gnext + 0.22 and vy > 5.2:
 			air = true
 			air_t = 0.0
-			vy -= G * dt
-			pos.y = ballistic
+			vy *= 0.78
+			pos.y += vy * dt
 		else:
-			vy = clampf((g - pos.y) / dt, -30.0, 30.0)
-			pos.y = g
-		# body attitude from the four contact points
-		var hf := _ground(pos.x + f.x * 1.36, pos.z + f.z * 1.36)
-		var hr := _ground(pos.x - f.x * 1.36, pos.z - f.z * 1.36)
-		var hl := _ground(pos.x + s.x * 0.8, pos.z + s.z * 0.8)
-		var hrt := _ground(pos.x - s.x * 0.8, pos.z - s.z * 0.8)
-		pitch = lerpf(pitch, atan2(hf - hr, 2.72), 1.0 - exp(-14.0 * dt))
-		roll = lerpf(roll, atan2(hl - hrt, 1.6), 1.0 - exp(-14.0 * dt))
-	wheel_spin += vF / CarModel.WR * dt * (1.0 + (2.5 if sink > 0.4 and gas > 0.05 else 0.0))
+			var v := clampf((gy - pos.y) / dt, -30.0, 30.0)
+			vy += (v - vy) * 0.5
+			pos.y = gy
+		f = fwd()
+		s = side()
+		var hf := terrain.height_at(pos.x + f.x * 1.36, pos.z + f.z * 1.36)
+		var hr := terrain.height_at(pos.x - f.x * 1.36, pos.z - f.z * 1.36)
+		var hl := terrain.height_at(pos.x + s.x * 0.8, pos.z + s.z * 0.8)
+		var hrt := terrain.height_at(pos.x - s.x * 0.8, pos.z - s.z * 0.8)
+		pitch = lerpf(pitch, atan2(hf - hr, 2.72), 1.0 - exp(-12.0 * dt))
+		roll = lerpf(roll, atan2(hl - hrt, 1.6), 1.0 - exp(-12.0 * dt))
+	slip = absf(vS) + (absf(vF) * 0.35 if hand else 0.0) + spin_k * 6.0
+	wheel_spin += (vF / CarModel.WR + spin_k * 14.0 * (1.0 if gas > 0.05 else 0.0) + (8.0 if sink > 0.4 and gas > 0.05 else 0.0)) * dt
 
 
 ## Puts the model where the simulation says (and turns wheels, steering, speedo).
@@ -203,3 +211,4 @@ func apply(m: CarModel) -> void:
 	m.steering_wheel.rotation.z = steer * 2.4
 	m.speedo.text = str(int(round(speed() * 3.6)))
 	m.fuel.text = "4×4" if awd else "2WD"
+	m.steering_wheel.rotation.z = steer * 2.4

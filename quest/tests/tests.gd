@@ -66,11 +66,13 @@ func _ready() -> void:
 	var flew := false
 	var crest := _crest(t)
 	var across := atan2(t.ridge_dir.x, t.ridge_dir.y)
-	c3.place(crest - Vector3(sin(across), 0, cos(across)) * 22.0, across)
-	c3.vel = c3.fwd() * 28.0
+	c3.place(crest - Vector3(sin(across), 0, cos(across)) * 40.0, across)   # up the gentle windward side
+	c3.vel = c3.fwd() * 30.0
 	c3.awd = true
+	var mvy := 0.0
 	for i in 72 * 4:
 		c3.update(1.0 / 72.0, 1.0, 0.0, 0.0)
+		mvy = maxf(mvy, c3.vy)
 		if c3.air and c3.air_t > 0.2:
 			flew = true
 			break

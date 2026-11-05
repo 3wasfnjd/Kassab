@@ -5,7 +5,7 @@ extends Node3D
 ## so wheels always sit on what you see. Chunks are built around the player as he drives.
 
 const CHUNK := 48.0
-const SEG := 24            # 2 m triangles: the low-poly facets
+const SEG := 16            # 3 m grid, smooth shaded: soft dunes, few triangles
 const RADIUS := 4          # chunks around the player (about 200 m, fog hides the edge)
 
 var n_big := FastNoiseLite.new()
@@ -36,7 +36,7 @@ func _init() -> void:
 	n_fine.seed = 23
 	n_fine.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	n_fine.frequency = 0.05
-	mat = MeshKit.vc_material(0.95)
+	mat = _sand_material()
 	_make_props()
 
 
@@ -46,10 +46,18 @@ func dune_mask(x: float, z: float) -> float:
 
 
 func _ridge(x: float, z: float) -> float:
+	# real dunes: a long gentle windward climb and a short steep slip face (the jump)
 	var u := x * ridge_dir.x + z * ridge_dir.y
 	var wob := n_mid.get_noise_2d(x * 0.6, z * 0.6) * 2.4
-	var r := 0.5 + 0.5 * cos(u * TAU / 96.0 + wob)
-	return r * r * r
+	var t := fposmod(u / 96.0 + wob / TAU, 1.0)
+	var r := 0.0
+	if t < 0.74:
+		var k := t / 0.74
+		r = k * k * (1.6 - 0.6 * k)   # steepest right at the lip, so a fast climb takes off
+	else:
+		var k2 := (t - 0.74) / 0.26
+		r = pow(1.0 - k2, 1.5) * (1.0 - 0.3 * k2 * (1.0 - k2))   # the slip face drops away right at the lip
+	return r
 
 
 func height_at(x: float, z: float) -> float:
@@ -79,50 +87,94 @@ func _hash(x: float, z: float) -> float:
 	return fposmod(sin(x * 12.9898 + z * 78.233) * 43758.5453, 1.0)
 
 
-func _face_color(a: Vector3, b: Vector3, c: Vector3) -> Color:
-	var ctr := (a + b + c) / 3.0
-	var n := (b - a).cross(c - a).normalized()
-	if n.y < 0.0:
-		n = -n
-	var m := dune_mask(ctr.x, ctr.z)
+func _vertex_color(x: float, z: float, n: Vector3) -> Color:
+	var m := dune_mask(x, z)
+	var hv := n_fine.get_noise_2d(x * 0.7, z * 0.7) * 0.5 + 0.5
 	var slope := 1.0 - n.y
-	# light comes from the late sun in the west-south-west: faces turned to it are pale
-	var sun := Vector3(-0.55, 0.62, 0.35).normalized()
-	var lit := clampf(n.dot(sun) * 1.2, 0.0, 1.0)
-	var sand := C_SLOPE.lerp(C_SAND, lit).lerp(C_CREST, smoothstep(0.55, 0.95, lit) * 0.6)
-	var hv := _hash(ctr.x, ctr.z)
+	var sand := C_SAND.lerp(C_CREST, clampf(_ridge(x, z) * 1.2, 0.0, 1.0) * 0.5).lerp(C_SLOPE, clampf(slope * 2.0, 0.0, 1.0) * 0.5)
 	var gravel := C_GRAVEL.lerp(C_GRAVEL2, hv)
-	var col := gravel.lerp(sand, smoothstep(0.15, 0.55, m + slope * 0.6))
-	var v := 0.97 + 0.06 * hv
+	var col := gravel.lerp(sand, smoothstep(0.1, 0.5, m + slope * 0.4))
+	var v := 0.96 + 0.08 * hv
 	return Color(col.r * v, col.g * v, col.b * v)
 
 
+## Sand: vertex colours times a fine grain, with wind ripples in the normal map (world-space, triplanar).
+func _sand_material() -> StandardMaterial3D:
+	var N := 256
+	var grain := Image.create(N, N, false, Image.FORMAT_RGB8)
+	var nrm := Image.create(N, N, false, Image.FORMAT_RGB8)
+	var gn := FastNoiseLite.new()
+	gn.seed = 5
+	gn.frequency = 0.08
+	var hgt := PackedFloat32Array()
+	hgt.resize(N * N)
+	for y in N:
+		for x in N:
+			# seamless: noise on a torus
+			var a := TAU * x / N
+			var b := TAU * y / N
+			var w := gn.get_noise_3d(cos(a) * 40.0, sin(a) * 40.0, cos(b) * 40.0 + sin(b) * 13.0)
+			var rip := sin(TAU * 7.0 * (float(y) / N) + w * 2.2)   # 7 ripples across the tile
+			hgt[y * N + x] = rip * 0.5 + w * 0.5
+			var g := 0.88 + 0.12 * (0.5 + 0.5 * gn.get_noise_3d(cos(a) * 160.0, sin(a) * 160.0, cos(b) * 160.0))
+			grain.set_pixel(x, y, Color(g, g, g))
+	for y in N:
+		for x in N:
+			var dx := hgt[y * N + (x + 1) % N] - hgt[y * N + (x - 1 + N) % N]
+			var dy := hgt[((y + 1) % N) * N + x] - hgt[((y - 1 + N) % N) * N + x]
+			var n := Vector3(-dx * 1.2, -dy * 1.2, 1.0).normalized()
+			nrm.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	grain.generate_mipmaps()
+	nrm.generate_mipmaps()
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.albedo_texture = ImageTexture.create_from_image(grain)
+	m.normal_enabled = true
+	m.normal_texture = ImageTexture.create_from_image(nrm)
+	m.normal_scale = 0.55
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3(0.22, 0.22, 0.22)
+	m.roughness = 0.97
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	return m
+
+
 func _build_chunk(ci: int, cj: int) -> MeshInstance3D:
-	var kit := MeshKit.new()
 	var x0 := ci * CHUNK
 	var z0 := cj * CHUNK
 	var st := CHUNK / SEG
-	var hs := PackedFloat32Array()
-	hs.resize((SEG + 1) * (SEG + 1))
+	var V := PackedVector3Array()
+	var Nn := PackedVector3Array()
+	var C := PackedColorArray()
+	var I := PackedInt32Array()
 	for j in SEG + 1:
 		for i in SEG + 1:
-			hs[j * (SEG + 1) + i] = height_at(x0 + i * st, z0 + j * st)
+			var x := x0 + i * st
+			var z := z0 + j * st
+			var n := normal_at(x, z)
+			V.append(Vector3(x, height_at(x, z), z))
+			Nn.append(n)
+			C.append(_vertex_color(x, z, n))
 	for j in SEG:
 		for i in SEG:
-			var p00 := Vector3(x0 + i * st, hs[j * (SEG + 1) + i], z0 + j * st)
-			var p10 := Vector3(x0 + (i + 1) * st, hs[j * (SEG + 1) + i + 1], z0 + j * st)
-			var p01 := Vector3(x0 + i * st, hs[(j + 1) * (SEG + 1) + i], z0 + (j + 1) * st)
-			var p11 := Vector3(x0 + (i + 1) * st, hs[(j + 1) * (SEG + 1) + i + 1], z0 + (j + 1) * st)
-			var below := p00 - Vector3.UP * 10.0
-			# alternate the diagonal so the facets do not line up in stripes
-			if (i + j) % 2 == 0:
-				kit.tri(p00, p10, p11, _face_color(p00, p10, p11), below)
-				kit.tri(p00, p11, p01, _face_color(p00, p11, p01), below)
-			else:
-				kit.tri(p00, p10, p01, _face_color(p00, p10, p01), below)
-				kit.tri(p10, p11, p01, _face_color(p10, p11, p01), below)
+			var a := j * (SEG + 1) + i
+			var b := a + 1
+			var c := a + SEG + 1
+			var d := c + 1
+			# clockwise = front face in Godot
+			I.append_array([a, b, d, a, d, c])
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = V
+	arr[Mesh.ARRAY_NORMAL] = Nn
+	arr[Mesh.ARRAY_COLOR] = C
+	arr[Mesh.ARRAY_INDEX] = I
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	mesh.surface_set_material(0, mat)
 	var mi := MeshInstance3D.new()
-	mi.mesh = kit.commit(null, mat)
+	mi.mesh = mesh
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	mi.set_meta("x0", x0)
@@ -178,11 +230,11 @@ func _make_props() -> void:
 	for i in 10:
 		var a := TAU * i / 10.0
 		pts.append(Vector3(cos(a) * (0.5 + 0.18 * sin(i * 2.3)), 0.0, sin(a) * (0.42 + 0.15 * cos(i * 1.7))))
-	var top := Vector3(0.08, 0.45, -0.05)
+	var top := Vector3(0.08, 0.32, -0.05)
 	for i in 10:
 		var a: Vector3 = pts[i]
 		var b: Vector3 = pts[(i + 1) % 10]
-		var mid := (a + b) * 0.5 * 0.75 + Vector3(0, 0.26 + 0.06 * sin(i * 3.1), 0)
+		var mid := (a + b) * 0.5 * 0.85 + Vector3(0, 0.2 + 0.05 * sin(i * 3.1), 0)
 		var c := Color(0.55, 0.47, 0.41).lerp(Color(0.45, 0.39, 0.35), fposmod(i * 0.37, 1.0))
 		k.tri(a, b, mid, c, Vector3(0, 0.15, 0))
 		k.tri(mid, b, top, c.lightened(0.08), Vector3(0, 0.15, 0))
@@ -194,8 +246,8 @@ func _make_props() -> void:
 		var a := TAU * i / 5.0 + 0.4
 		var c := Vector3(cos(a) * 0.32, 0.32 + 0.1 * sin(i * 2.0), sin(a) * 0.32)
 		k.beam(Vector3(0, 0, 0), c, 0.05, 0.05, Color(0.42, 0.33, 0.24))
-		k.box(c + Vector3(0, 0.1, 0), Vector3(0.42, 0.3, 0.42), Color(0.55, 0.6, 0.42).lerp(Color(0.62, 0.62, 0.48), i * 0.2), 0.12, Basis(Vector3.UP, a))
-	k.box(Vector3(0, 0.45, 0), Vector3(0.5, 0.36, 0.5), Color(0.58, 0.63, 0.45), 0.14, Basis(Vector3.UP, 0.7))
+		k.box(c + Vector3(0, 0.1, 0), Vector3(0.42, 0.3, 0.42), Color(0.42, 0.45, 0.32).lerp(Color(0.5, 0.5, 0.38), i * 0.2), 0.12, Basis(Vector3.UP, a))
+	k.box(Vector3(0, 0.45, 0), Vector3(0.5, 0.36, 0.5), Color(0.46, 0.49, 0.35), 0.14, Basis(Vector3.UP, 0.7))
 	props.append(k.commit(null, pm))
 	# a grass tuft («ثمام») on the dunes
 	k = MeshKit.new()
@@ -213,9 +265,9 @@ func _make_props() -> void:
 	k.beam(Vector3(0, 0, 0), Vector3(0.3, 1.6, 0.1), 0.22, 0.22, bark, 0.05)
 	for b in [[Vector3(-1.4, 2.9, 0.3)], [Vector3(1.6, 3.0, -0.4)], [Vector3(0.2, 3.1, 1.3)], [Vector3(0.5, 3.0, -1.3)]]:
 		k.beam(Vector3(0.3, 1.6, 0.1), b[0], 0.12, 0.12, bark, 0.03)
-	var leaf := Color(0.46, 0.55, 0.3)
+	var leaf := Color(0.34, 0.41, 0.24)
 	for c in [[Vector3(-1.2, 3.15, 0.3), 2.2], [Vector3(1.4, 3.25, -0.3), 2.4], [Vector3(0.2, 3.35, 1.1), 2.0], [Vector3(0.5, 3.2, -1.2), 2.0], [Vector3(0.2, 3.45, 0.0), 2.6]]:
-		k.box(c[0], Vector3(c[1], 0.38, c[1] * 0.8), leaf.lerp(Color(0.54, 0.6, 0.34), randf_range(0, 1) if false else 0.4), 0.15, Basis(Vector3.UP, c[1]), leaf.lightened(0.12))
+		k.box(c[0], Vector3(c[1], 0.38, c[1] * 0.8), leaf.lerp(Color(0.42, 0.47, 0.28), 0.4), 0.15, Basis(Vector3.UP, c[1]), leaf.lightened(0.08))
 	props.append(k.commit(null, pm))
 
 
