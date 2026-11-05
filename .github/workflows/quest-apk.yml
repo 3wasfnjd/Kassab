@@ -1,0 +1,43 @@
+name: Kassab Quest APK · تطبيق الكويست
+# Builds, tests and verifies the native Godot Meta Quest APK (quest/) on the quest-native branch.
+# The APK is kept as a run artifact (7 days) for sideload testing; nothing is published.
+on:
+  push:
+    branches: [quest-native]
+    paths: ['quest/**', '.github/workflows/quest-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kassab-quest-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/kassab-godot
+          key: godot-4.6.3-stable-v1
+      - name: Build, test and verify APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          OUT_DIR: ${{ github.workspace }}/build
+        run: bash quest/tools/ci/build_apk.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kassab-quest-${{ github.run_number }}
+          path: |
+            build/*.apk
+            build/*.sha256
+            build/*.txt
+            build/export.log
+          if-no-files-found: warn
+          retention-days: 7
