@@ -84,6 +84,7 @@ func _ready() -> void:
 		if c3.pos.y < t.height_at(c3.pos.x, c3.pos.z) - 0.05:
 			under = true
 	check(not under, "stays on or above the ground for 20 s")
+	_missions(t)
 	print("TOTAL ", "OK" if fails == 0 else "%d FAILED" % fails)
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--report="):
@@ -145,3 +146,39 @@ func _toward_dunes(t: Terrain, p: Vector3) -> float:
 			bm = m
 			best = a
 	return best
+
+
+## The rescue mission end to end: reach the bogged car, hook the rope, tow it to camp.
+func _missions(t: Terrain) -> void:
+	var camp := _find(t, false)
+	var cm := Car.new(t, camp, 0.0)
+	var ms := Missions.new(t, cm, null, camp)
+	ms.xp = 0
+	ms.idx = 0
+	ms.wait = 0.0
+	add_child(ms)
+	ms.update(0.1, false, true)
+	check(ms.m.get("kind", "") == "rescue", "first mission is the rescue")
+	var at: Vector3 = ms.m.at
+	check(t.dune_mask(at.x, at.z) > 0.5 and Vector2(at.x - camp.x, at.z - camp.z).length() > 200.0, "the bogged car is out in the dunes")
+	cm.place(Vector3(at.x + 5.0, t.height_at(at.x + 5.0, at.z), at.z), 0.0)
+	for i in 20:
+		ms.update(0.1, false, true)
+	check(ms.m.get("stage", 0) == 1, "rope hooked after stopping next to him")
+	var far := 0.0
+	for i in 400:
+		var d := camp - cm.pos
+		d.y = 0
+		if ms.m.is_empty():
+			break
+		var h := atan2(d.x, d.z)
+		var np := cm.pos + d.normalized() * minf(1.5, d.length())
+		cm.place(Vector3(np.x, t.height_at(np.x, np.z), np.z), h)
+		ms.update(0.1, false, true)
+		if not ms.m.is_empty():
+			far = maxf(far, Vector2(ms.m.at.x - cm.pos.x, ms.m.at.z - cm.pos.z).length())
+	check(ms.m.is_empty() and ms.xp == 150, "towed home: mission done, +150 (xp %d)" % ms.xp)
+	check(far < 9.6, "the towed car stays on the rope (max %.1f m)" % far)
+	ms.update(10.0, false, true)
+	ms.on_landing(0.9)
+	check(ms.m.get("kind", "") == "deliver", "next is the water delivery")

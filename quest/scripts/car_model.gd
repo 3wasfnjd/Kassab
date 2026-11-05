@@ -378,6 +378,14 @@ func set_gauges(kmh: float, rpm: float, awd: bool) -> void:
 	awd_mat.emission_energy_multiplier = 2.0 if awd else 0.0
 
 
+## Repaint (multiplies the body colours): other drivers' cars, unlocked colours.
+func tint(c: Color) -> void:
+	var mi := body_root.get_child(0) as MeshInstance3D
+	var mat := (mi.mesh.surface_get_material(0) as StandardMaterial3D).duplicate() as StandardMaterial3D
+	mat.albedo_color = c
+	mi.set_surface_override_material(0, mat)
+
+
 ## Where the steering wheel sits in the world (centre, the axis it turns about, an "up" on its rim).
 func wheel_frame() -> Transform3D:
 	var p := steering_wheel.get_parent() as Node3D

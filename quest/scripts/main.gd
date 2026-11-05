@@ -29,6 +29,7 @@ var tip: Label3D
 var tip_t := 0.0
 var prev := {}
 var engine: EngineAudio
+var missions: Missions
 var hands := {}            # "left"/"right" -> hand mesh
 var grab := {}             # hand -> {a0: angle on the rim when grabbed, s0: steer then}
 var wheel_steer := 0.0
@@ -57,6 +58,11 @@ func _ready() -> void:
 	_rig()
 	engine = EngineAudio.new()
 	add_child(engine)
+	var camp := start + Vector3(sin(car.h + PI / 2), 0, cos(car.h + PI / 2)) * 16.0 - Vector3(sin(car.h), 0, cos(car.h)) * 6.0
+	missions = Missions.new(terrain, car, font, camp)
+	add_child(missions)
+	missions.attach_hud(xr_cam if xr_on else cam)
+	missions.said.connect(_say)
 	view = shot.get("view", "in")
 	if shot.has("notip"):
 		tip.visible = false
@@ -230,6 +236,7 @@ func _read_input() -> Dictionary:
 	var b_view := false
 	var b_awd := false
 	var b_reset := false
+	var b_photo := false
 	var hb := false
 	if xr_on:
 		gas = right.get_float("trigger")
@@ -245,6 +252,7 @@ func _read_input() -> Dictionary:
 		b_view = right.is_button_pressed("ax_button")
 		b_awd = left.is_button_pressed("by_button")
 		b_reset = right.is_button_pressed("by_button")
+		b_photo = left.is_button_pressed("ax_button")
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
 		gas = 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -257,10 +265,11 @@ func _read_input() -> Dictionary:
 	b_awd = b_awd or Input.is_key_pressed(KEY_F)
 	b_reset = b_reset or Input.is_key_pressed(KEY_R)
 	hb = hb or Input.is_key_pressed(KEY_SPACE)
+	b_photo = b_photo or Input.is_key_pressed(KEY_P)
 	if shot.has("drive"):
 		gas = 1.0
 		st = float(shot.get("steer", "0"))
-	return {hand = hb, gas = gas, brake = brake, steer = st, view = _pressed("view", b_view), awd = _pressed("awd", b_awd), reset = _pressed("reset", b_reset)}
+	return {hand = hb, gas = gas, brake = brake, steer = st, view = _pressed("view", b_view), awd = _pressed("awd", b_awd), reset = _pressed("reset", b_reset), photo = _pressed("photo", b_photo)}
 
 
 func _pulse(ctrl: XRController3D, amp: float, dur: float) -> void:
@@ -297,6 +306,7 @@ func _process(dt: float) -> void:
 				_say("غرّزت! شغّل الدبل بزر Y", 4.0)
 				_pulse(left, 0.6, 0.25)
 			"land":
+				missions.on_landing(car.landed)
 				_pulse(left, 0.3 + car.landed * 0.7, 0.12)
 				_pulse(right, 0.3 + car.landed * 0.7, 0.12)
 	car.events.clear()
@@ -304,6 +314,7 @@ func _process(dt: float) -> void:
 		_pulse(right, 0.15, 0.05)
 	car.apply(model)
 	model.set_lamps(0.0, inp.brake > 0.1 and car.vF > 0.3)
+	missions.update(dt, inp.photo, view == "in")
 	fx.update(car, terrain)
 	terrain.update_around(car.pos.x, car.pos.z, 1)
 	sun.global_position = car.pos
