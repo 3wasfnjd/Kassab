@@ -30,11 +30,18 @@ func _init() -> void:
 	var q := QuadMesh.new()
 	q.size = Vector2(0.34, 1.0)
 	q.orientation = PlaneMesh.FACE_Y
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.roughness = 1.0
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var sh := Shader.new()
+	sh.code = "shader_type spatial;\nrender_mode unshaded, depth_draw_never, shadows_disabled;\n" + MeshKit.CLIP + """
+void vertex() { clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	ALBEDO = COLOR.rgb;
+	ALPHA = COLOR.a;
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	MeshKit.register_clip(m)
 	q.material = m
 	mm = MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -52,7 +59,7 @@ func _particles(tex: Texture2D, n: int, life: float, col: Color, s0: float, s1: 
 	var p := CPUParticles3D.new()
 	p.amount = n
 	p.lifetime = life
-	p.local_coords = false
+	p.local_coords = true   # particles live in the world's space (the table view scales it)
 	p.emitting = false
 	var q := QuadMesh.new()
 	q.size = Vector2.ONE
@@ -60,13 +67,14 @@ func _particles(tex: Texture2D, n: int, life: float, col: Color, s0: float, s1: 
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.billboard_keep_scale = true   # the table view shrinks the world, dust included
 	m.albedo_texture = tex
 	m.vertex_color_use_as_albedo = true
 	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	q.material = m
 	p.mesh = q
-	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	p.emission_box_extents = Vector3(0.9, 0.1, 0.3)
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_POINTS
+	p.emission_points = PackedVector3Array([Vector3.ZERO])
 	p.direction = Vector3(0, 1, -1)
 	p.spread = 35.0
 	p.initial_velocity_min = 1.0
@@ -93,14 +101,14 @@ func update(car: Car, terrain: Terrain) -> void:
 	var s := car.side()
 	var sp := car.speed()
 	var rear := car.pos - f * 1.5 + Vector3.UP * 0.25
-	dust.global_position = rear
+	dust.emission_points = _spread(rear, s)
 	dust.direction = (-f + Vector3.UP * 0.9).normalized()
 	var on_sand := terrain.dune_mask(car.pos.x, car.pos.z) > 0.15
 	var amt := clampf((sp - 2.5) / 18.0 + absf(car.vS) * 0.12, 0.0, 1.0) * (1.0 if not car.air else 0.0)
 	dust.emitting = amt > 0.05
 	dust.speed_scale = 0.8 + amt * 0.6
 	dust.initial_velocity_max = 2.0 + sp * 0.18
-	spray.global_position = rear - Vector3.UP * 0.1
+	spray.emission_points = _spread(rear - Vector3.UP * 0.1, s)
 	spray.direction = (-f + Vector3.UP * 0.7).normalized()
 	spray.emitting = (car.sink > 0.3 and car.vF < 3.0) or (on_sand and absf(car.vS) > 3.0 and not car.air)
 	spray.initial_velocity_max = 4.0 + absf(car.vS)
@@ -131,3 +139,11 @@ func update(car: Car, terrain: Terrain) -> void:
 			head = (head + 1) % TRACK_N
 			mm.visible_instance_count = mini(TRACK_N, mm.visible_instance_count + 1)
 		last[k] = p
+
+
+## Emission points across the rear axle (the emitters stay put; the points follow the car).
+func _spread(c: Vector3, s: Vector3) -> PackedVector3Array:
+	var pts := PackedVector3Array()
+	for i in 5:
+		pts.append(c + s * (-0.9 + 0.45 * i))
+	return pts

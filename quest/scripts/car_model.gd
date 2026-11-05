@@ -381,8 +381,8 @@ func set_gauges(kmh: float, rpm: float, awd: bool) -> void:
 ## Repaint (multiplies the body colours): other drivers' cars, unlocked colours.
 func tint(c: Color) -> void:
 	var mi := body_root.get_child(0) as MeshInstance3D
-	var mat := (mi.mesh.surface_get_material(0) as StandardMaterial3D).duplicate() as StandardMaterial3D
-	mat.albedo_color = c
+	var mat := MeshKit.register_clip((mi.mesh.surface_get_material(0) as ShaderMaterial).duplicate() as ShaderMaterial)
+	mat.set_shader_parameter("tint", c)
 	mi.set_surface_override_material(0, mat)
 
 

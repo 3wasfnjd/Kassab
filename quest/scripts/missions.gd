@@ -50,13 +50,13 @@ func _ready() -> void:
 	add_child(beacon)
 	arrow = _arrow()
 	add_child(arrow)
+	arrow.top_level = true
 	rope = MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(0.035, 0.035, 1.0)
 	rope.mesh = bm
-	var rm := StandardMaterial3D.new()
-	rm.albedo_color = Color(0.85, 0.55, 0.15)
-	rope.material_override = rm
+	rope.material_override = MeshKit.flat_material(Color(0.85, 0.55, 0.15))
+
 	rope.visible = false
 	add_child(rope)
 
@@ -85,6 +85,10 @@ func rank() -> String:
 
 
 # ---------------------------------------------------------------- every frame
+## Table view: where the disc of desert sits in the room (main sets these every frame).
+var table := {}   # {c: scene centre, r: radius, s: scale, view: world point at the centre}
+
+
 func update(dt: float, photo: bool, in_cab: bool) -> void:
 	if m.is_empty():
 		wait -= dt
@@ -108,7 +112,7 @@ func update(dt: float, photo: bool, in_cab: bool) -> void:
 		return
 	beacon.visible = target != null
 	if target != null:
-		beacon.global_position = Vector3(target.x, terrain.height_at(target.x, target.z), target.z)
+		beacon.position = Vector3(target.x, terrain.height_at(target.x, target.z), target.z)
 	_place_arrow(target, in_cab)
 
 
@@ -132,7 +136,7 @@ func _start(k: int) -> void:
 			tow_model.tint(Color(1.0, 0.62, 0.5))
 			props.add_child(tow_model)
 			var hh := rng.randf() * TAU
-			tow_model.global_transform = Transform3D(_ground_basis(p, hh), p - Vector3.UP * 0.35)
+			tow_model.transform = Transform3D(_ground_basis(p, hh), p - Vector3.UP * 0.35)
 			m = {kind = "rescue", stage = 0, at = p, h = hh, hold = 0.0}
 			said.emit("المخيم: «أبو فهد غرّز ورا الطعوس، الحقه بالحبل وجيبه» — اتبع السهم", 6.0)
 		1:
@@ -209,15 +213,14 @@ func _rescue(dt: float):
 		m.h = atan2(-dv.x, -dv.z)
 	tp.y = terrain.height_at(tp.x, tp.z)
 	m.at = tp
-	tow_model.global_transform = Transform3D(_ground_basis(tp, m.h), tp)
+	tow_model.transform = Transform3D(_ground_basis(tp, m.h), tp)
 	car.taut = L > 6.8
 	var front := tp + Vector3(sin(m.h), 0, cos(m.h)) * 2.2 + Vector3.UP * 0.6
 	var back := hitch + Vector3.UP * 0.6
 	rope.visible = true
-	rope.global_position = (front + back) * 0.5
-	if front.distance_to(back) > 0.1:
-		rope.look_at(back, Vector3.UP)
-	rope.scale = Vector3(1, 1, front.distance_to(back))
+	var L2 := front.distance_to(back)
+	if L2 > 0.1:
+		rope.transform = Transform3D(Basis.looking_at(back - front, Vector3.UP).scaled_local(Vector3(1, 1, L2)), (front + back) * 0.5)
 	var dc := Vector2(car.pos.x - camp.x, car.pos.z - camp.z).length()
 	_hud("فزعة: اسحبه للمخيم — %d م" % int(dc))
 	if dc < 18.0:
@@ -327,14 +330,24 @@ func _place_arrow(target, in_cab: bool) -> void:
 	arrow.visible = target != null
 	if target == null:
 		return
+	var d: Vector3 = target - car.pos
+	var dist := Vector2(d.x, d.z).length()
+	arrow_lbl.text = "%d م" % int(dist) if dist < 1000.0 else "%.1f كم" % (dist / 1000.0)
+	if not table.is_empty():
+		# on the table: off the disc, a pin on the rim points the way; on the disc the beam shows it
+		var v: Vector3 = target - table.view
+		var off: float = Vector2(v.x, v.z).length() * table.s
+		var dir := Vector3(v.x, 0, v.z).normalized()
+		var c: Vector3 = table.c
+		if off < table.r * 0.92:
+			arrow.visible = false
+			return
+		arrow.global_transform = Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z)).scaled(Vector3.ONE * 0.28), c + dir * (table.r + 0.06) + Vector3.UP * 0.03)
+		return
 	var at := car.pos + Vector3.UP * 3.3
 	if in_cab:
 		at = car.pos + Basis.from_euler(Vector3(-car.pitch, car.h, car.roll), EULER_ORDER_YXZ) * Vector3(0.0, 1.62, 1.35)
-	arrow.global_position = at
-	var d: Vector3 = target - car.pos
-	arrow.rotation = Vector3(0, atan2(d.x, d.z), 0)
-	var dist := Vector2(d.x, d.z).length()
-	arrow_lbl.text = "%d م" % int(dist) if dist < 1000.0 else "%.1f كم" % (dist / 1000.0)
+	arrow.global_transform = Transform3D(Basis(Vector3.UP, atan2(d.x, d.z)), at)
 
 
 func _arrow() -> Node3D:
@@ -364,22 +377,16 @@ func _beacon() -> MeshInstance3D:
 	var cm := CylinderMesh.new()
 	cm.top_radius = 0.9
 	cm.bottom_radius = 1.6
-	cm.height = 90.0
+	cm.height = 30.0
 	cm.radial_segments = 12
 	cm.cap_top = false
 	cm.cap_bottom = false
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	mat.albedo_color = Color(1.0, 0.65, 0.2, 0.28)
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.disable_fog = true
+	var mat := MeshKit.flat_material(Color(1.0, 0.65, 0.2, 0.35), true)
 	var mi := MeshInstance3D.new()
 	mi.mesh = cm
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.position.y = 45.0
+	mi.position.y = 15.0
 	var holder := MeshInstance3D.new()   # the beam rises from the ground point
 	holder.add_child(mi)
 	holder.visible = false
@@ -413,10 +420,7 @@ func _build_camp() -> void:
 	sm.radius = 0.32
 	sm.height = 0.7
 	fire.mesh = sm
-	var fm := StandardMaterial3D.new()
-	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	fm.albedo_color = Color(1.0, 0.55, 0.15)
-	fire.material_override = fm
+	fire.material_override = MeshKit.flat_material(Color(1.0, 0.55, 0.15))
 	fire.position = c + Vector3(0, 0.35, 6.0)
 	add_child(fire)
 	var lamp := OmniLight3D.new()
@@ -448,8 +452,7 @@ func _tent(c: Vector3, s: float) -> Node3D:
 	for i in 4:
 		k.box(Vector3(-w * 0.35 + i * w * 0.23, 0.2, -d * 0.35), Vector3(1.2 * s, 0.35, 0.4), Color(0.25, 0.3, 0.45) if i % 2 else Color(0.75, 0.55, 0.2), 0.08)
 	var mi := MeshInstance3D.new()
-	var mat := MeshKit.vc_material(0.95)
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mat := MeshKit.vc_material(0.95, 0.0, 0.0, true)
 	mi.mesh = k.commit(null, mat)
 	mi.position = c
 	return mi

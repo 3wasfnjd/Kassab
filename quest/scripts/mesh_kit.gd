@@ -215,12 +215,79 @@ func commit(mesh: ArrayMesh = null, mat: Material = null) -> ArrayMesh:
 	return mesh
 
 
-static func vc_material(rough := 0.85, metal := 0.0, emit := 0.0) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.roughness = rough
-	m.metallic = metal
-	if emit > 0.0:
-		m.emission_enabled = true
-		m.emission_energy_multiplier = emit
+## Every world material can be cut to a round window (the table view shows a disc of desert):
+## fragments farther than clip_r from clip_c (scene space, horizontal) are dropped.
+static var clip_c := Vector3.ZERO
+static var clip_r := 1.0e9
+static var clip_mats: Array[ShaderMaterial] = []
+static var _vc_shaders := {}
+static var _flat_shaders := {}
+
+const CLIP := """
+uniform vec3 clip_c;
+uniform float clip_r = 1.0e9;
+varying vec3 clip_wp;
+"""
+
+
+static func register_clip(m: ShaderMaterial) -> ShaderMaterial:
+	m.set_shader_parameter("clip_c", clip_c)
+	m.set_shader_parameter("clip_r", clip_r)
+	clip_mats.append(m)
 	return m
+
+
+static func set_clip(c: Vector3, r: float) -> void:
+	clip_c = c
+	clip_r = r
+	for m in clip_mats:
+		m.set_shader_parameter("clip_c", c)
+		m.set_shader_parameter("clip_r", r)
+
+
+## Vertex-coloured, lit (the style of every code-built mesh).
+static func vc_material(rough := 0.85, metal := 0.0, emit := 0.0, two_sided := false) -> ShaderMaterial:
+	if not _vc_shaders.has(two_sided):
+		var sh := Shader.new()
+		sh.code = "shader_type spatial;\nrender_mode %s;\n" % ("cull_disabled" if two_sided else "cull_back") + CLIP + """
+uniform float rough = 0.85;
+uniform float metal = 0.0;
+uniform float emit = 0.0;
+uniform vec4 tint : source_color = vec4(1.0);
+void vertex() { clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	ALBEDO = COLOR.rgb * tint.rgb;
+	ROUGHNESS = rough;
+	METALLIC = metal;
+	SPECULAR = 0.3;
+	EMISSION = COLOR.rgb * emit;
+}
+"""
+		_vc_shaders[two_sided] = sh
+	var m := ShaderMaterial.new()
+	m.shader = _vc_shaders[two_sided]
+	m.set_shader_parameter("rough", rough)
+	m.set_shader_parameter("metal", metal)
+	m.set_shader_parameter("emit", emit)
+	return register_clip(m)
+
+
+## One flat unlit colour (fire, beams of light); additive glows when `add`.
+static func flat_material(col: Color, add := false) -> ShaderMaterial:
+	if not _flat_shaders.has(add):
+		var sh := Shader.new()
+		sh.code = "shader_type spatial;\nrender_mode unshaded, cull_disabled%s;\n" % (", blend_add, depth_draw_never, shadows_disabled" if add else "") + CLIP + """
+uniform vec4 col : source_color = vec4(1.0);
+void vertex() { clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	ALBEDO = col.rgb;
+	ALPHA = col.a;
+}
+"""
+		_flat_shaders[add] = sh
+	var m := ShaderMaterial.new()
+	m.shader = _flat_shaders[add]
+	m.set_shader_parameter("col", col)
+	return register_clip(m)

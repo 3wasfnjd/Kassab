@@ -13,7 +13,7 @@ var n_mid := FastNoiseLite.new()
 var n_fine := FastNoiseLite.new()
 var chunks := {}
 var queue: Array = []
-var mat: StandardMaterial3D
+var mat: ShaderMaterial
 var ridge_dir := Vector2(cos(0.42), sin(0.42))
 var props: Array[Mesh] = []   # rock, shrub, tuft, acacia
 var trees: Array[Vector2] = []
@@ -99,7 +99,7 @@ func _vertex_color(x: float, z: float, n: Vector3) -> Color:
 
 
 ## Sand: vertex colours times a fine grain, with wind ripples in the normal map (world-space, triplanar).
-func _sand_material() -> StandardMaterial3D:
+func _sand_material() -> ShaderMaterial:
 	var N := 256
 	var grain := Image.create(N, N, false, Image.FORMAT_RGB8)
 	var nrm := Image.create(N, N, false, Image.FORMAT_RGB8)
@@ -126,17 +126,40 @@ func _sand_material() -> StandardMaterial3D:
 			nrm.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
 	grain.generate_mipmaps()
 	nrm.generate_mipmaps()
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = ImageTexture.create_from_image(grain)
-	m.normal_enabled = true
-	m.normal_texture = ImageTexture.create_from_image(nrm)
-	m.normal_scale = 0.55
-	m.uv1_triplanar = true
-	m.uv1_world_triplanar = true
-	m.uv1_scale = Vector3(0.22, 0.22, 0.22)
-	m.roughness = 0.97
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var sh := Shader.new()
+	sh.code = """shader_type spatial;
+render_mode cull_back;
+uniform sampler2D grain : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D ripples : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform mat4 world_inv;     // scene -> game world (the table view scales and moves the world)
+uniform vec3 clip_c;
+uniform float clip_r = 1.0e9;
+varying vec3 clip_wp;
+varying vec3 gw;
+void vertex() {
+	clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	gw = (world_inv * vec4(clip_wp, 1.0)).xyz;
+}
+void fragment() {
+	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	vec2 uv = gw.xz * 0.22;
+	float g = texture(grain, uv).r;
+	ALBEDO = COLOR.rgb * g;
+	ROUGHNESS = 0.97;
+	SPECULAR = 0.15;
+	// wind ripples: the tile's normal tilts the world normal (top projection; the sand is mostly up)
+	vec3 t = texture(ripples, uv).xyz * 2.0 - 1.0;
+	vec3 nw = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	nw = normalize(nw + vec3(t.x, 0.0, t.y) * 0.55 * nw.y);
+	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("grain", ImageTexture.create_from_image(grain))
+	m.set_shader_parameter("ripples", ImageTexture.create_from_image(nrm))
+	m.set_shader_parameter("world_inv", Transform3D.IDENTITY)
+	MeshKit.register_clip(m)
 	return m
 
 
@@ -282,7 +305,7 @@ func _scatter(parent: Node3D, x0: float, z0: float) -> void:
 		var r := rng.randf()
 		var kind := -1
 		if m < 0.25:
-			kind = 0 if r < 0.5 else (1 if r < 0.9 else (3 if r < 0.908 else -1))
+			kind = 0 if r < 0.22 else (1 if r < 0.55 else (3 if r < 0.562 else -1))   # sparse: reads clean from above
 		elif m > 0.6 and r < 0.18 and normal_at(x, z).y > 0.93:
 			kind = 2
 		if kind < 0:
