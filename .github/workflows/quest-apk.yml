@@ -1,13 +1,14 @@
 name: Kassab Quest APK · تطبيق الكويست
 # Builds, tests and verifies the native Godot Meta Quest APK (quest/) on the quest-native branch.
-# The APK is kept as a run artifact (7 days) for sideload testing; nothing is published.
+# The APK is kept as a run artifact and also attached to the «quest-latest» pre-release, so the newest
+# build always has the same direct download link.
 on:
   push:
     branches: [quest-native]
     paths: ['quest/**', '.github/workflows/quest-apk.yml']
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: kassab-quest-apk-${{ github.ref }}
   cancel-in-progress: true
@@ -41,3 +42,15 @@ jobs:
             build/export.log
           if-no-files-found: warn
           retention-days: 7
+      - name: Direct download link (quest-latest pre-release)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          cp "$APK" build/kassab-quest.apk
+          gh release view quest-latest -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create quest-latest -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "Kassab Quest — آخر نسخة للتجربة" --notes "أحدث ملف APK لتطبيق كساب على Meta Quest (موقّع بمفتاح التجربة)."
+          gh release upload quest-latest build/kassab-quest.apk -R "$GITHUB_REPOSITORY" --clobber
+          echo "::notice::https://github.com/$GITHUB_REPOSITORY/releases/download/quest-latest/kassab-quest.apk"
