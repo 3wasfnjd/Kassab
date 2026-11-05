@@ -15,13 +15,15 @@ var chunks := {}
 var queue: Array = []
 var mat: StandardMaterial3D
 var ridge_dir := Vector2(cos(0.42), sin(0.42))
+var props: Array[Mesh] = []   # rock, shrub, tuft, acacia
+var trees: Array[Vector2] = []
 
 # palette (warm late-afternoon desert)
 const C_CREST := Color(0.9, 0.74, 0.52)
 const C_SAND := Color(0.85, 0.66, 0.45)
 const C_SLOPE := Color(0.8, 0.6, 0.41)
-const C_GRAVEL := Color(0.66, 0.53, 0.42)
-const C_GRAVEL2 := Color(0.58, 0.46, 0.37)
+const C_GRAVEL := Color(0.6, 0.51, 0.43)
+const C_GRAVEL2 := Color(0.5, 0.42, 0.36)
 
 
 func _init() -> void:
@@ -35,6 +37,7 @@ func _init() -> void:
 	n_fine.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	n_fine.frequency = 0.05
 	mat = MeshKit.vc_material(0.95)
+	_make_props()
 
 
 ## How much of a dune field is here: 0 on the gravel plains, 1 in the dunes.
@@ -122,6 +125,9 @@ func _build_chunk(ci: int, cj: int) -> MeshInstance3D:
 	mi.mesh = kit.commit(null, mat)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
+	mi.set_meta("x0", x0)
+	mi.set_meta("z0", z0)
+	_scatter(mi, x0, z0)
 	return mi
 
 
@@ -137,6 +143,7 @@ func update_around(x: float, z: float, budget := 1) -> void:
 			want[Vector2i(ci + di, cj + dj)] = di * di + dj * dj
 	for k in chunks.keys():
 		if not want.has(k):
+			_drop_trees(chunks[k])
 			chunks[k].queue_free()
 			chunks.erase(k)
 	var missing := []
@@ -160,3 +167,97 @@ func pending_around(x: float, z: float) -> int:
 			if di * di + dj * dj <= (RADIUS + 0.5) * (RADIUS + 0.5) and not chunks.has(Vector2i(ci + di, cj + dj)):
 				n += 1
 	return n
+
+
+# ---------------------------------------------------------------- props: stones, shrubs, grass, acacias
+func _make_props() -> void:
+	var pm := MeshKit.vc_material(0.9)
+	# a faceted stone
+	var k := MeshKit.new()
+	var pts := []
+	for i in 10:
+		var a := TAU * i / 10.0
+		pts.append(Vector3(cos(a) * (0.5 + 0.18 * sin(i * 2.3)), 0.0, sin(a) * (0.42 + 0.15 * cos(i * 1.7))))
+	var top := Vector3(0.08, 0.45, -0.05)
+	for i in 10:
+		var a: Vector3 = pts[i]
+		var b: Vector3 = pts[(i + 1) % 10]
+		var mid := (a + b) * 0.5 * 0.75 + Vector3(0, 0.26 + 0.06 * sin(i * 3.1), 0)
+		var c := Color(0.55, 0.47, 0.41).lerp(Color(0.45, 0.39, 0.35), fposmod(i * 0.37, 1.0))
+		k.tri(a, b, mid, c, Vector3(0, 0.15, 0))
+		k.tri(mid, b, top, c.lightened(0.08), Vector3(0, 0.15, 0))
+		k.tri(a, mid, top, c.lightened(0.05), Vector3(0, 0.15, 0))
+	props.append(k.commit(null, pm))
+	# a shrub («رمث»): a few grey-green clumps on short woody stems
+	k = MeshKit.new()
+	for i in 5:
+		var a := TAU * i / 5.0 + 0.4
+		var c := Vector3(cos(a) * 0.32, 0.32 + 0.1 * sin(i * 2.0), sin(a) * 0.32)
+		k.beam(Vector3(0, 0, 0), c, 0.05, 0.05, Color(0.42, 0.33, 0.24))
+		k.box(c + Vector3(0, 0.1, 0), Vector3(0.42, 0.3, 0.42), Color(0.55, 0.6, 0.42).lerp(Color(0.62, 0.62, 0.48), i * 0.2), 0.12, Basis(Vector3.UP, a))
+	k.box(Vector3(0, 0.45, 0), Vector3(0.5, 0.36, 0.5), Color(0.58, 0.63, 0.45), 0.14, Basis(Vector3.UP, 0.7))
+	props.append(k.commit(null, pm))
+	# a grass tuft («ثمام») on the dunes
+	k = MeshKit.new()
+	for i in 7:
+		var a := TAU * i / 7.0
+		var tip := Vector3(cos(a) * 0.35, 0.7 + 0.15 * sin(i * 1.9), sin(a) * 0.35)
+		var base := Vector3(cos(a + 1.2) * 0.06, 0, sin(a + 1.2) * 0.06)
+		var w := Vector3(-sin(a), 0, cos(a)) * 0.05
+		k.tri(base - w, base + w, tip, Color(0.76, 0.72, 0.5).lerp(Color(0.62, 0.66, 0.42), i / 7.0), Vector3(0, 0.3, 0) - Vector3(cos(a), 0, sin(a)) * 0.3)
+		k.tri(base + w, base - w, tip, Color(0.7, 0.66, 0.46), Vector3(0, 0.3, 0) + Vector3(cos(a), 0, sin(a)) * 0.3)
+	props.append(k.commit(null, pm))
+	# an acacia («طلحة»): a leaning trunk, forked branches and a flat umbrella crown
+	k = MeshKit.new()
+	var bark := Color(0.32, 0.25, 0.2)
+	k.beam(Vector3(0, 0, 0), Vector3(0.3, 1.6, 0.1), 0.22, 0.22, bark, 0.05)
+	for b in [[Vector3(-1.4, 2.9, 0.3)], [Vector3(1.6, 3.0, -0.4)], [Vector3(0.2, 3.1, 1.3)], [Vector3(0.5, 3.0, -1.3)]]:
+		k.beam(Vector3(0.3, 1.6, 0.1), b[0], 0.12, 0.12, bark, 0.03)
+	var leaf := Color(0.46, 0.55, 0.3)
+	for c in [[Vector3(-1.2, 3.15, 0.3), 2.2], [Vector3(1.4, 3.25, -0.3), 2.4], [Vector3(0.2, 3.35, 1.1), 2.0], [Vector3(0.5, 3.2, -1.2), 2.0], [Vector3(0.2, 3.45, 0.0), 2.6]]:
+		k.box(c[0], Vector3(c[1], 0.38, c[1] * 0.8), leaf.lerp(Color(0.54, 0.6, 0.34), randf_range(0, 1) if false else 0.4), 0.15, Basis(Vector3.UP, c[1]), leaf.lightened(0.12))
+	props.append(k.commit(null, pm))
+
+
+func _scatter(parent: Node3D, x0: float, z0: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector2i(int(x0), int(z0)))
+	var lists := [[], [], [], []]
+	for i in 70:
+		var x := x0 + rng.randf() * CHUNK
+		var z := z0 + rng.randf() * CHUNK
+		var m := dune_mask(x, z)
+		var r := rng.randf()
+		var kind := -1
+		if m < 0.25:
+			kind = 0 if r < 0.5 else (1 if r < 0.9 else (3 if r < 0.908 else -1))
+		elif m > 0.6 and r < 0.18 and normal_at(x, z).y > 0.93:
+			kind = 2
+		if kind < 0:
+			continue
+		var sc := rng.randf_range(0.5, 1.3) if kind != 3 else rng.randf_range(0.9, 1.3)
+		if kind == 0 and rng.randf() < 0.25:
+			sc *= 2.2
+		var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(sc, sc * rng.randf_range(0.8, 1.2), sc))
+		lists[kind].append(Transform3D(b, Vector3(x, height_at(x, z) - 0.05 * sc, z)))
+	for kind in 4:
+		if lists[kind].is_empty():
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = props[kind]
+		mm.instance_count = lists[kind].size()
+		for i in lists[kind].size():
+			mm.set_instance_transform(i, lists[kind][i])
+		var mi := MultiMeshInstance3D.new()
+		mi.multimesh = mm
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if kind == 3 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		parent.add_child(mi)
+	# remember where the acacias stand (the car bumps into them)
+	for t in lists[3]:
+		trees.append(Vector2(t.origin.x, t.origin.z))
+
+
+func _drop_trees(chunk: Node3D) -> void:
+	var x0 := chunk.get_meta("x0", 0.0) as float
+	trees = trees.filter(func(t): return t.x < x0 or t.x >= x0 + CHUNK or t.y < chunk.get_meta("z0", 0.0) or t.y >= chunk.get_meta("z0", 0.0) + CHUNK)

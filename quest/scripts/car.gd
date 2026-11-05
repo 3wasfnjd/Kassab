@@ -136,6 +136,23 @@ func _step(dt: float, gas: float, brake: float, steer_in: float) -> void:
 	vel.z = f.z * vF + s.z * vS
 	pos.x += vel.x * dt
 	pos.z += vel.z * dt
+	# acacia trunks stop the car
+	for tr in terrain.trees:
+		var dx := pos.x - tr.x
+		var dz := pos.z - tr.y
+		if absf(dx) > 3.0 or absf(dz) > 3.0:
+			continue
+		var d := sqrt(dx * dx + dz * dz)
+		if d < 1.6 and d > 0.001:
+			var n := Vector3(dx / d, 0, dz / d)
+			pos.x += n.x * (1.6 - d)
+			pos.z += n.z * (1.6 - d)
+			var vn := vel.dot(n)
+			if vn < 0.0:
+				if vn < -4.0:
+					events.append("crash")
+				vel -= n * vn * 1.4
+				vel *= 0.6
 
 	# vertical: follow the ground, or fly off a crest when the ground falls away faster than gravity
 	var g := _ground(pos.x, pos.z)

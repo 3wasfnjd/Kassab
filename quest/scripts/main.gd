@@ -82,7 +82,7 @@ func _world() -> void:
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.78, 0.72, 0.68)
+	env.ambient_light_color = Color(0.72, 0.72, 0.76)
 	env.ambient_light_energy = 0.55
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 0.92
@@ -97,7 +97,7 @@ func _world() -> void:
 	we.environment = env
 	add_child(we)
 	sun = DirectionalLight3D.new()
-	sun.light_color = Color(1.0, 0.9, 0.76)
+	sun.light_color = Color(1.0, 0.94, 0.84)
 	sun.light_energy = 0.95
 	sun.rotation = Vector3(deg_to_rad(-48), deg_to_rad(-62), 0)
 	sun.shadow_opacity = 0.75
@@ -266,7 +266,8 @@ func _process(dt: float) -> void:
 	if inp.reset:
 		car.place(car.pos + Vector3.UP * 0.2, car.h)
 		_say("رجّعنا السيارة على كفراتها", 1.6)
-	car.update(dt, inp.gas, inp.brake, inp.steer)
+	if not _shot_done:
+		car.update(dt, inp.gas, inp.brake, inp.steer)
 	for e in car.events:
 		match e:
 			"stuck":
