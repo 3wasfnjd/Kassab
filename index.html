@@ -219,7 +219,6 @@ body.title:not(.intro) #load{display:flex}
 #loadtx{font-size:12px;font-weight:800;color:#3a2412;font-variant-numeric:tabular-nums}
 @media (orientation:portrait){#load{left:20%;width:60%;bottom:calc(48% + env(safe-area-inset-bottom,0px))}}
 [hidden]{display:none!important}
-#vrBtn{display:block;margin:12px auto 0;font:800 16px var(--font);color:#f2c27a;background:#2a2118;border:0;border-radius:14px;padding:7px 26px 9px}#vrBtn[hidden]{display:none}
 #start.show{animation:startIn .45s ease-out both}
 @keyframes startIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){#start.show{animation:none}}
@@ -339,7 +338,6 @@ body.title .hud,body.title #map,body.title #reset,body.title #radio,body.title #
   <input id="nick" maxlength="16" placeholder="اسمك في الأونلاين" dir="auto" autocomplete="off" hidden>
   <div id="carPick" hidden><button data-car="gmc">جمس</button><button data-car="haval">هافال</button></div>
   <button id="start" hidden>ابدأ</button>
-  <button id="vrBtn" hidden>🥽 واقع افتراضي</button>
 </div>
 
 <script src="lib/three.min.js"></script>
@@ -1887,12 +1885,11 @@ function spinProps(dt){drone.userData.props.forEach((p,i)=>p.rotation.y+=dt*(i%2
 function setFreeze(v){PH.freeze=v;const b=document.getElementById('phFreeze');if(b){b.classList.toggle('on',v);b.textContent=v?'⏸ تجميد':'▶ متحرك';}
   if(snd.out&&snd.ctx)snd.out.gain.setTargetAtTime(v&&PH.on?0.12:0.9,snd.ctx.currentTime,0.15);}
 function frozen(){return PH.on&&PH.freeze;}
-function enterPhoto(){if(PH.on||game.mode!=='play'||XR.on)return;PH.on=true;setFreeze(true);PH.take=0;PH.land=0;PH.mode='drone';{const sb=phSub();PH.cam0=camera.position.clone();PH.orb.a=Math.atan2(camera.position.x-sb.x,camera.position.z-sb.z);}
+function enterPhoto(){if(PH.on||game.mode!=='play')return;PH.on=true;setFreeze(true);PH.take=0;PH.land=0;PH.mode='drone';{const sb=phSub();PH.cam0=camera.position.clone();PH.orb.a=Math.atan2(camera.position.x-sb.x,camera.position.z-sb.z);}
   document.body.classList.add('photo');document.querySelectorAll('#phTop button').forEach(b=>b.classList.toggle('on',b.dataset.m==='drone'));camera.fov=innerHeight>innerWidth?66:50;camera.updateProjectionMatrix();}
 function exitPhoto(){if(!PH.on||PH.land>0)return;if(PH.rec)stopRec();setFreeze(false);PH.freeze=false;if(PH.mode==='drone'&&PH.take>=1){PH.land=1.1;if(FOOT.st!=='on')camera.position.copy(camState.pos);}else{drone.visible=false;PH.on=false;PH.freeze=true;document.body.classList.remove('photo');resize();}}
 function readInput(t){
   if(game.mode!=='play'&&!window.__autopilot){input.steer=0;input.gas=0;input.brake=0;input.hand=false;return;}
-  if(XR.on&&xrInput())return;
   if(PH.on){input.steer=0;input.gas=0;input.brake=(S.vF||0)>0.5?1:0;input.hand=false;return;}   // photo mode: the car brakes to a stop (never reverses)
   if(FOOT.st!=='off'){input.steer=0;input.gas=0;input.brake=(S.vF||0)>0.3?1:0;input.hand=false;return;}   // driver out walking: car stays parked
   if(KS.st!=='off'){const go=held.gas||keys.ArrowUp||keys.KeyW||(window.__autopilot&&window.__autopilot(t).gas>0);if(go&&KS.st!=='stop')ksLeave(true);
@@ -2136,11 +2133,11 @@ function updateVisual(dt){
 }
 
 /* ---------------- resize + adaptive quality ---------------- */
-function resize(){if(renderer.xr&&renderer.xr.isPresenting)return;const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=h>w?60:44;camera.updateProjectionMatrix();
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=h>w?60:44;camera.updateProjectionMatrix();
   dustU.uScale.value=h*pixelRatio*camera.projectionMatrix.elements[5]*0.5;dustU.uMaxPx.value=h*pixelRatio*0.45;}
 addEventListener('resize',resize);resize();
 let fpsAcc=0,fpsN=0,fpsT=0,lowered=0;
-function adapt(dt){if(renderer.xr&&renderer.xr.isPresenting)return;fpsAcc+=dt;fpsN++;fpsT+=dt;if(fpsT<2.5)return;const fps=fpsN/fpsAcc;fpsAcc=fpsN=fpsT=0;
+function adapt(dt){fpsAcc+=dt;fpsN++;fpsT+=dt;if(fpsT<2.5)return;const fps=fpsN/fpsAcc;fpsAcc=fpsN=fpsT=0;
   if(fps<42&&lowered<2){lowered++;pixelRatio=Math.max(0.75,pixelRatio-0.3);renderer.setPixelRatio(pixelRatio);resize();
     if(lowered===2){sun.shadow.mapSize.set(1024,1024);sun.shadow.map&&sun.shadow.map.dispose();sun.shadow.map=null;}}}
 
@@ -2438,7 +2435,7 @@ async function loadCarSplit(name){
   return{g,tex};}
 const loadEl=document.getElementById('load'),loadBar=document.getElementById('loadbar'),loadTx=document.getElementById('loadtx'),startEl=document.getElementById('start');
 // the Start button appears only once the model is actually on screen: wait for it to be drawn, then fade the button in
-function carLoadDone(){loadEl.hidden=true;const show=()=>{startEl.hidden=false;startEl.classList.add('show');xrOffer();document.getElementById('nick').hidden=false;const cp=document.getElementById('carPick');cp.hidden=false;cp.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.car===CARSEL));};
+function carLoadDone(){loadEl.hidden=true;const show=()=>{startEl.hidden=false;startEl.classList.add('show');document.getElementById('nick').hidden=false;const cp=document.getElementById('carPick');cp.hidden=false;cp.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.car===CARSEL));};
   if(window.__noLoop){show();return;}requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(show,500)));}
 setInterval(()=>{if(loadEl.hidden)return;const k=carLoad.total?Math.min(0.99,carLoad.got/carLoad.total):0;loadBar.style.width=(k*100).toFixed(1)+'%';
   loadEl.setAttribute('aria-valuenow',Math.round(k*100));loadTx.textContent=Math.round(k*100).toLocaleString('ar-SA')+'٪';},150);
@@ -2519,99 +2516,6 @@ carLoad.total=17313216;   // original .glb (repo); the published page uses the s
 loadGLB('models/car_orig.glb',true).catch(()=>{carLoad.got=0;carLoad.total=22738956;return loadCarSplit('car_orig');}).then(d=>{carLoadDone();if(game.mode==='play'){d.g.dispose();return;}carModels.hq=carMesh(d);carModels.hq.material.map.anisotropy=8;if(CARSEL==='haval'){carModels.hq.visible=false;body.add(carModels.hq);}else useCar(carModels.hq);})
   .catch(e=>{console.warn('original car',e);origFailed=true;carLoadDone();if(carModels.light&&game.mode!=='play')useCar(carModels.light);});
 
-/* ---------------- VR: the same game in a Meta Quest headset (WebXR from the Quest browser) ----------------
-   Two views (A switches): inside the car behind the wheel, or a chase view behind it. On foot it is first person:
-   left stick walks where you look, right stick turns in 30° steps. Controllers:
-   right trigger gas · left trigger brake/reverse · left stick steer · A view (on foot: sit / ride) · B get out / in
-   X kashta · Y 4×4 · right grip rocket · left grip horn · press the left stick and talk on the walkie-talkie */
-const XR={on:false,view:'in',rig:new T.Group(),yaw:0,prev:{},panel:null,ctx:null,tex:null,panelT:0,vig:null,lastH:0,camQ:new T.Quaternion()};
-scene.add(XR.rig);XR.rig.add(camera);
-renderer.xr.enabled=true;renderer.xr.setReferenceSpaceType('local');
-function xrOffer(){const b=document.getElementById('vrBtn');if(!navigator.xr||!navigator.xr.isSessionSupported)return;
-  navigator.xr.isSessionSupported('immersive-vr').then(ok=>{if(ok)b.hidden=false;}).catch(()=>{});}
-document.getElementById('vrBtn').addEventListener('click',()=>{
-  const req=navigator.xr.requestSession('immersive-vr',{optionalFeatures:['local-floor','hand-tracking']});   // asked first, inside the tap
-  window.__xrNoFs=true;if(game.mode==='title')document.getElementById('start').click();
-  req.then(async ss=>{try{renderer.xr.setFramebufferScaleFactor(0.85);}catch(e){}await renderer.xr.setSession(ss);try{renderer.xr.setFoveation(1);}catch(e){}xrStart();ss.addEventListener('end',xrEnd);})
-    .catch(e=>{console.warn('xr',e);showToast('ما قدرنا ندخل الواقع الافتراضي',2.5);});});
-function xrStart(){XR.on=true;document.body.classList.add('xr');camera.near=0.06;camera.updateProjectionMatrix();XR.sunSh=sun.castShadow;sun.castShadow=false;
-  XR.yaw=S.h;XR.lastH=S.h;xrHud();showToast('🥽 أهلاً في كساب — A يغيّر المنظور',3);}
-function xrEnd(){XR.on=false;document.body.classList.remove('xr');camera.near=0.5;camera.updateProjectionMatrix();sun.castShadow=XR.sunSh!==false;
-  XR.rig.position.set(0,0,0);XR.rig.quaternion.identity();if(window.__carModel)window.__carModel.visible=true;if(plates)plates.forEach(p=>p.visible=true);
-  for(const m of [carModels.gmc,carModels.haval,carModels.light])if(m&&m.userData.cock)m.userData.cock.visible=false;
-  if(FOOT.g&&FOOT.st==='on'&&!FOOT.ride)FOOT.g.visible=true;if(KS.man)KS.man.visible=true;camState.init=false;resize();}
-// a simple cockpit (dashboard, hood, sills and a steering wheel that turns), so the inside view never looks through the model's painted windows
-function xrCockpit(m){if(m.userData.cock)return m.userData.cock;const bb=m.userData.bb,k=m.userData.k,len=m.userData.len||CAR_LEN,H2=(bb.max.y-bb.min.y)*k,W2=(bb.max.x-bb.min.x)*k;
-  const hv=m===carModels.haval,paint=new T.MeshStandardMaterial({color:hv?0xa3a7ac:0xbba684,roughness:0.45,metalness:0.3}),dark=new T.MeshStandardMaterial({color:0x26231f,roughness:0.8});
-  const g=new T.Group(),seat={x:W2*0.21,y:H2*(hv?0.68:0.64),z:len*(hv?0.08:0.08)};g.userData.seat=seat;
-  const box=(w,h,d,mat,x,y,z)=>{const b=new T.Mesh(new T.BoxGeometry(w,h,d),mat);b.position.set(x,y,z);g.add(b);return b;};
-  box(W2*0.9,0.16,0.55,dark,0,seat.y-0.42,seat.z+0.8);
-  const hl=len/2-(seat.z+1.05);box(W2*0.92,0.07,hl,paint,0,seat.y-0.47,seat.z+1.05+hl/2);
-  box(0.09,0.34,1.6,paint,W2*0.46,seat.y-0.58,seat.z-0.1);box(0.09,0.34,1.6,paint,-W2*0.46,seat.y-0.58,seat.z-0.1);
-  box(0.05,0.05,0.9,dark,W2*0.43,seat.y-0.05,seat.z+0.55).rotation.x=0.9;box(0.05,0.05,0.9,dark,-W2*0.43,seat.y-0.05,seat.z+0.55).rotation.x=0.9;   // A-pillars
-  const piv=new T.Group();piv.position.set(seat.x,seat.y-0.32,seat.z+0.46);piv.rotation.x=-0.42;g.add(piv);
-  const wh=new T.Mesh(new T.TorusGeometry(0.18,0.024,8,28),dark);piv.add(wh);const sp=new T.Mesh(new T.BoxGeometry(0.34,0.035,0.02),dark);wh.add(sp);g.userData.wheel=wh;
-  g.visible=false;body.add(g);m.userData.cock=g;return g;}
-function xrHud(){if(XR.panel)return;const c=document.createElement('canvas');c.width=768;c.height=256;XR.ctx=c.getContext('2d');XR.tex=new T.CanvasTexture(c);XR.tex.encoding=T.sRGBEncoding;
-  XR.panel=new T.Mesh(new T.PlaneGeometry(0.42,0.14),new T.MeshBasicMaterial({map:XR.tex,transparent:true,depthTest:false,depthWrite:false}));XR.panel.renderOrder=998;XR.panel.position.set(0,-0.24,-0.62);XR.panel.rotation.x=-0.35;camera.add(XR.panel);
-  XR.vig=new T.Mesh(new T.RingGeometry(0.13,1.6,40),new T.MeshBasicMaterial({color:0,transparent:true,opacity:0,depthTest:false,depthWrite:false}));XR.vig.renderOrder=999;XR.vig.position.z=-0.3;camera.add(XR.vig);}
-function xrDrawHud(){const x=XR.ctx,W=768,Hh=256;x.clearRect(0,0,W,Hh);x.fillStyle='rgba(30,20,10,.55)';x.beginPath();x.roundRect?x.roundRect(6,6,W-12,Hh-12,40):x.rect(6,6,W-12,Hh-12);x.fill();
-  x.fillStyle='#fff';x.textAlign='center';x.textBaseline='middle';x.font='800 92px "Baloo Bhaijaan 2",Tahoma,sans-serif';
-  const walking=FOOT.st==='on';x.fillText(walking?(FOOT.ride?'راكب':'🚶'):String(Math.round(S.spd*3.6)),150,104);
-  x.font='700 30px Tahoma,sans-serif';x.fillText(walking?'':'km/h'+(S.awd?' · 4×4':''),150,180);
-  x.direction='rtl';x.textAlign='right';x.font='800 38px "Baloo Bhaijaan 2",Tahoma,sans-serif';
-  const t=!toastEl.hidden?toastEl.textContent:'';x.fillStyle='#ffd38a';x.fillText(t.length>30?t.slice(0,29)+'…':t,W-30,78);
-  let hint;if(FOOT.ride)hint='B انزل';else if(walking){hint=[!ftSitBtn.hidden?'A '+ftSitBtn.textContent:'',!ftRideBtn.hidden?'A '+ftRideBtn.textContent:'',!ftInBtn.hidden?'B اركب':'B ارجع للسيارة'].filter(Boolean).join(' · ');}
-  else hint='A منظور · B انزل · X كشتة · Y دبل';
-  x.fillStyle='#fff';x.font='700 32px "Baloo Bhaijaan 2",Tahoma,sans-serif';x.fillText(hint,W-30,150);
-  if(NET.ws&&NET.id){x.fillStyle='#7fe08a';x.font='700 28px Tahoma,sans-serif';x.fillText('أونلاين '+AR_N(NET.peers.size+1)+(RK.score?' · ⭐'+AR_N(RK.score):''),W-30,208);}
-  XR.tex.needsUpdate=true;}
-function xrPads(){const ss=renderer.xr.getSession&&renderer.xr.getSession(),o={L:null,R:null};if(!ss)return o;
-  for(const src of ss.inputSources){if(!src.gamepad)continue;if(src.handedness==='left')o.L=src.gamepad;else if(src.handedness==='right')o.R=src.gamepad;}return o;}
-const xb=(g,i)=>!!(g&&g.buttons[i]&&g.buttons[i].pressed),xv=(g,i)=>(g&&g.buttons[i])?g.buttons[i].value:0,xa=(g,i)=>{const v=g&&g.axes[i]||0;return Math.abs(v)<0.15?0:v;};
-function xrEdge(name,now){const was=XR.prev[name];XR.prev[name]=now;return now&&!was;}
-// returns true when it has set the driving input itself
-function xrInput(){const {L,R}=xrPads();const walking=FOOT.st==='on';
-  // buttons (on the press)
-  if(xrEdge('A',xb(R,4))){if(walking){if(!ftSitBtn.hidden)ftSitBtn.click();else if(!ftRideBtn.hidden&&!FOOT.ride)ftRideBtn.click();}else{XR.view=XR.view==='in'?'out':'in';showToast(XR.view==='in'?'داخل السيارة':'من برّا',1.2);}}
-  if(xrEdge('B',xb(R,5))){if(FOOT.ride)ftRideBtn.click();else if(walking)footIn();else footBtn.click();}
-  if(xrEdge('X',xb(L,4)))ksBtn.click();
-  if(xrEdge('Y',xb(L,5))&&!walking)document.getElementById('awd').click();
-  if(xrEdge('RG',xb(R,1))&&!walking)rkFire();
-  if(xrEdge('LG',xb(L,1))&&NET.ws&&!walking){hornSound(1);netSend({t:'horn'});}
-  {const ptt=xb(L,3);if(xrEdge('PTT',ptt)&&window.__rad&&RAD.ch)window.__rad.down();else if(!ptt&&XR.prev.pttWas&&window.__rad)window.__rad.up();XR.prev.pttWas=ptt;}
-  if(walking){FOOT.stick.x=xa(L,2);FOOT.stick.y=xa(L,3);FOOT.run=xv(R,0)>0.5;
-    const tx=xa(R,2);if(Math.abs(tx)>0.7&&!XR.prev.snap){XR.yaw-=Math.sign(tx)*PI/6;XR.prev.snap=true;}else if(Math.abs(tx)<0.3)XR.prev.snap=false;
-    return false;}
-  if(FOOT.st!=='off'||KS.st!=='off'||PH.on){if(KS.st!=='off'&&xv(R,0)>0.5&&KS.st!=='stop')ksLeave(true);return false;}
-  input.steer+=(xa(L,2)-input.steer)*0.3;input.gas=xv(R,0)>0.1?1:0;input.brake=xv(L,0)>0.1?1:0;input.hand=false;
-  if(keys.ArrowUp||keys.ArrowDown||keys.ArrowLeft||keys.ArrowRight||held.gas||held.brake)return false;   // keyboard / touch still work
-  return true;}
-const _xq=new T.Quaternion(),_xe=new T.Euler(0,0,0,'YXZ'),_xv=new T.Vector3(),_xd=new T.Vector3();
-function xrPlace(dt){const r=XR.rig;
-  if(!XR.panel)xrHud();XR.panelT-=dt;if(XR.panelT<=0){XR.panelT=0.2;xrDrawHud();}
-  let cockpit=false,vig=0;
-  // the way the head looks (world yaw) steers walking
-  camera.getWorldDirection(_xd);const headYaw=Math.atan2(_xd.x,_xd.z);
-  if(FOOT.st==='on'&&FOOT.ride){const p=NET.peers.get(FOOT.ride);if(p&&p.cur){const h=p.carH||0;let dh=h-XR.yaw;dh=Math.atan2(Math.sin(dh),Math.cos(dh));XR.yaw+=dh*Math.min(1,dt*2);
-      r.position.set(p.cur[0]-Math.sin(XR.yaw)*8,H(p.cur[0],p.cur[1])+3.6,p.cur[1]-Math.cos(XR.yaw)*8);r.quaternion.setFromAxisAngle(_up,PI+XR.yaw);vig=Math.min(0.7,Math.abs(dh)*1.5);}}
-  else if(FOOT.st==='on'){if(FOOT.g)FOOT.g.visible=false;if(heroTag)heroTag.visible=false;
-    r.position.set(FOOT.x,FOOT.y+(FOOT.sit?0.95:1.62),FOOT.z);r.quaternion.setFromAxisAngle(_up,PI+XR.yaw);FOOT.cyaw=headYaw;}
-  else if(KS.st==='out'||KS.st==='camp'||KS.st==='pack'){const m=KS.man;if(m){m.visible=false;const sit=KS.t>4.1;
-      r.position.set(m.position.x,m.position.y+(sit?0.95:1.62),m.position.z);r.quaternion.setFromAxisAngle(_up,PI+XR.yaw+(sit?(KS.yawU-XR.yaw)*Math.min(1,dt*2):0));if(sit)XR.yaw+=(Math.atan2(Math.sin(KS.yawU-XR.yaw),Math.cos(KS.yawU-XR.yaw)))*Math.min(1,dt*2);}}
-  else{const m=window.__carModel;const yawRate=Math.atan2(Math.sin(S.h-XR.lastH),Math.cos(S.h-XR.lastH))/Math.max(dt,1e-3);XR.lastH=S.h;
-    if(XR.view==='in'&&m){cockpit=true;const ck=xrCockpit(m),st=ck.userData.seat;ck.visible=true;ck.userData.wheel.rotation.z=-input.steer*2.2;
-      body.updateWorldMatrix(true,false);_xv.set(st.x,st.y,st.z);body.localToWorld(_xv);r.position.copy(_xv);
-      _xe.set(-(S.pitch||0)*0.6,S.h,(S.roll||0)*0.6,'YXZ');r.quaternion.setFromEuler(_xe).multiply(_xq.setFromAxisAngle(_up,PI));XR.yaw=S.h;
-      vig=Math.min(0.75,Math.max(0,Math.abs(yawRate)-0.35)*0.45+(S.air?0.35:0));}
-    else{let dh=S.h-XR.yaw;dh=Math.atan2(Math.sin(dh),Math.cos(dh));XR.yaw+=dh*Math.min(1,dt*1.8);
-      r.position.set(S.x-Math.sin(XR.yaw)*8.5,S.y+3.4,S.z-Math.cos(XR.yaw)*8.5);const gy=H(r.position.x,r.position.z)+1.4;if(r.position.y<gy)r.position.y=gy;
-      r.quaternion.setFromAxisAngle(_up,PI+XR.yaw);vig=Math.min(0.6,Math.abs(dh)*1.2);}}
-  // the car model hides when you sit inside it; the cockpit shows instead
-  const cm=window.__carModel;if(cm)cm.visible=!cockpit;if(plates)plates.forEach(p=>p.visible=!cockpit);
-  for(const m of [carModels.gmc,carModels.haval,carModels.light,carModels.hq])if(m&&m.userData.cock&&(!cockpit||m!==cm))m.userData.cock.visible=false;
-  if(XR.vig)XR.vig.material.opacity+=(vig-XR.vig.material.opacity)*Math.min(1,dt*6);}
-window.__xr={XR,xrPlace,xrStart,xrInput};
 /* ---------------- loop ---------------- */
 let mapT=0,wT=0;
 /* ---------------- desert wildlife: dhub lizards at their burrows, and snakes ---------------- */
@@ -3134,7 +3038,7 @@ document.getElementById('start').addEventListener('click',()=>{if(game.mode!=='t
   {const nk=document.getElementById('nick');NET.name=(nk.value||'').trim().slice(0,16);if(NET.name)lsSet('kassab_name',NET.name);nk.blur();nk.hidden=true;document.getElementById('carPick').hidden=true;netStart();}   // online starts with the drive
   game.mode='intro';game.t=0;document.body.classList.add('intro');initSound();if(!station)tune(1); // radio starts with the same tap as the engine
   // full screen + landscape where the browser allows it (hides the bars, so fewer edge swipes); ignored where refused
-  try{const el=document.documentElement,fs=window.__xrNoFs?null:(el.requestFullscreen||el.webkitRequestFullscreen);if(fs){const pr=fs.call(el,{navigationUI:'hide'});if(pr&&pr.then)pr.then(()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}}catch(e){}
+  try{const el=document.documentElement,fs=el.requestFullscreen||el.webkitRequestFullscreen;if(fs){const pr=fs.call(el,{navigationUI:'hide'});if(pr&&pr.then)pr.then(()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{});}catch(e){}}).catch(()=>{});}}catch(e){}
   if(!carModels.hq&&carModels.light)useCar(carModels.light); // original not ready yet: drive the light one
   
   if(snd.ctx&&snd.ctx.state==='suspended')snd.ctx.resume();});
@@ -3142,22 +3046,22 @@ let last=performance.now(),acc=0,simT=0;
 window.__state=S;window.__dbg={sun,tMat,renderer,scene,dust,hemi,car,camera};
 function frame(now){
   const dt=Math.min(0.1,(now-last)/1000);last=now;acc+=dt;
-  if(frozen()){acc=0;updateVisual(dt);updateChunks(FOC.x,FOC.z,1);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}if(XR.on)xrPlace(dt);renderer.render(scene,camera);if(!window.__autopilot)adapt(dt);return;}
+  if(frozen()){acc=0;updateVisual(dt);updateChunks(FOC.x,FOC.z,1);if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.hidden=true;}renderer.render(scene,camera);if(!window.__autopilot)adapt(dt);requestAnimationFrame(frame);return;}
   readInput(simT);
   let steps=0;while(acc>=DT&&steps<5){stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);acc-=DT;simT+=DT;steps++;}
   if(steps===5)acc=0;
   updateVisual(dt);
   worldTick(dt,now);
   flushStamps();
-  if(XR.on)xrPlace(dt);
   renderer.render(scene,camera);
   if(!window.__autopilot)adapt(dt);
+  requestAnimationFrame(frame);
 }
 // test hook: advance simulation deterministically without rAF timing
 window.__advance=function(sec){const n=Math.round(sec/DT);for(let i=0;i<n;i++){if(frozen()){updateVisual(DT);continue;}readInput(simT);stepCar(DT);stepDyn(DT);carEffects(DT);stepParticles(DT);simT+=DT;updateVisual(DT);worldTick(DT,0);if(i%4===0)flushStamps();}flushStamps();renderer.render(scene,camera);};
 window.__world={CRIT,KS,FOOT,FOC,NET,RK,rkFire,get PT(){return PT;},footOut,footIn,ksStart,ksLeave,PLATE,fitPlates,SIMP,queue,actors,SITES,chunks,S,env,WADI,LAKE,tow,movers,teleport:(x,z,h)=>{if(KS.st!=='off')ksClear();if(FOOT.st!=='off')footCancel();S.x=x;S.z=z;S.h=h||0;S.vx=S.vz=0;updateChunks(x,z,25);S.y=H(x,z);camState.yaw=S.h;camState.init=false;}};
 updateVisual(DT);
-window.__noLoop?renderer.render(scene,camera):renderer.setAnimationLoop(frame);
+window.__noLoop?renderer.render(scene,camera):requestAnimationFrame(frame);
 })();
 </script>
 
