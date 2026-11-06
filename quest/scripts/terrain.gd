@@ -6,7 +6,7 @@ extends Node3D
 
 const CHUNK := 48.0
 const SEG := 16            # 3 m grid, smooth shaded: soft dunes, few triangles
-const RADIUS := 4          # chunks around the player (about 200 m, fog hides the edge)
+const RADIUS := 5          # chunks around the player (about 250 m, haze hides the edge)
 
 var n_big := FastNoiseLite.new()
 var n_mid := FastNoiseLite.new()
@@ -16,7 +16,7 @@ var queue: Array = []
 var mat: ShaderMaterial
 var ridge_dir := Vector2(cos(0.42), sin(0.42))
 var props: Array[Mesh] = []   # rock, shrub, tuft, acacia
-var trees: Array[Vector2] = []
+var trees: Array[Vector3] = []   # obstacles: x, z, radius
 
 # palette (warm late-afternoon desert)
 const C_CREST := Color(0.9, 0.74, 0.52)
@@ -202,7 +202,10 @@ func _build_chunk(ci: int, cj: int) -> MeshInstance3D:
 	add_child(mi)
 	mi.set_meta("x0", x0)
 	mi.set_meta("z0", z0)
+	var n0 := trees.size()
 	_scatter(mi, x0, z0)
+	_landmark(mi, x0, z0)
+	mi.set_meta("obs", trees.slice(n0))
 	return mi
 
 
@@ -330,9 +333,116 @@ func _scatter(parent: Node3D, x0: float, z0: float) -> void:
 		parent.add_child(mi)
 	# remember where the acacias stand (the car bumps into them)
 	for t in lists[3]:
-		trees.append(Vector2(t.origin.x, t.origin.z))
+		trees.append(Vector3(t.origin.x, t.origin.z, 0.2))
 
 
 func _drop_trees(chunk: Node3D) -> void:
-	var x0 := chunk.get_meta("x0", 0.0) as float
-	trees = trees.filter(func(t): return t.x < x0 or t.x >= x0 + CHUNK or t.y < chunk.get_meta("z0", 0.0) or t.y >= chunk.get_meta("z0", 0.0) + CHUNK)
+	var obs: Array = chunk.get_meta("obs", [])
+	if not obs.is_empty():
+		trees = trees.filter(func(t): return not obs.has(t))
+
+
+# ---------------------------------------------------------------- landmarks of the open desert
+## Now and then a chunk of plain carries a place: a mud-brick hamlet with palms, a rock outcrop
+## or a well. Deterministic per chunk, so the same place is always in the same spot.
+static var _lm_mat: Material
+
+
+func _landmark(parent: Node3D, x0: float, z0: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector2i(int(x0) * 7 + 3, int(z0) * 13 + 5))
+	var cx := x0 + CHUNK * 0.5 + rng.randf_range(-8, 8)
+	var cz := z0 + CHUNK * 0.5 + rng.randf_range(-8, 8)
+	if absf(cx) < 60.0 and absf(cz) < 60.0:
+		return
+	var r := rng.randf()
+	var m := dune_mask(cx, cz)
+	var k := MeshKit.new()
+	var cy := height_at(cx, cz)
+	k.xf = Transform3D(Basis.IDENTITY, Vector3(cx, cy, cz))
+	if m < 0.2 and r < 0.06:
+		_hamlet(k, rng, cx, cz, cy)
+	elif m < 0.45 and r < 0.13:
+		_outcrop(k, rng, cx, cz)
+	elif m < 0.2 and r < 0.17:
+		_well(k, cx, cz)
+	else:
+		return
+	if _lm_mat == null:
+		_lm_mat = MeshKit.vc_material(0.92)
+	var mi := MeshInstance3D.new()
+	mi.mesh = k.commit(null, _lm_mat)
+	parent.add_child(mi)
+
+
+func _hamlet(k: MeshKit, rng: RandomNumberGenerator, cx: float, cz: float, cy: float) -> void:
+	var mud := Color(0.56, 0.38, 0.24)
+	var mud2 := Color(0.62, 0.43, 0.27)
+	var dark := Color(0.12, 0.08, 0.05)
+	var n := rng.randi_range(3, 6)
+	for i in n:
+		var a := rng.randf() * TAU
+		var d := rng.randf_range(4.0, 16.0)
+		var p := Vector3(cos(a) * d, 0, sin(a) * d)
+		p.y = height_at(cx + p.x, cz + p.z) - cy - 0.3
+		var w := rng.randf_range(5.0, 8.0)
+		var dd := rng.randf_range(5.0, 7.0)
+		var hh := rng.randf_range(3.2, 5.5)
+		var rot := Basis(Vector3.UP, rng.randf_range(-0.3, 0.3))
+		k.box(p + Vector3(0, hh * 0.5, 0), Vector3(w, hh, dd), mud, 0.15, rot, mud2)
+		# crenellated parapet (the Najdi saw-tooth) and a dark door and windows
+		for j in int(w / 0.9):
+			k.box(p + rot * Vector3(-w * 0.5 + 0.45 + j * 0.9, hh + 0.25, dd * 0.5 - 0.1), Vector3(0.45, 0.5, 0.2), mud2, 0.05, rot)
+		k.box(p + rot * Vector3(0, 1.0, dd * 0.5 + 0.02), Vector3(1.1, 2.0, 0.06), dark, 0.0, rot)
+		for wx in [-w * 0.3, w * 0.3]:
+			k.box(p + rot * Vector3(wx, hh * 0.7, dd * 0.5 + 0.02), Vector3(0.35, 0.5, 0.06), dark, 0.0, rot)
+		trees.append(Vector3(cx + p.x, cz + p.z, maxf(w, dd) * 0.5))
+	# palms around the houses
+	for i in rng.randi_range(4, 8):
+		var a := rng.randf() * TAU
+		var d := rng.randf_range(10.0, 22.0)
+		var p := Vector3(cos(a) * d, 0, sin(a) * d)
+		p.y = height_at(cx + p.x, cz + p.z) - cy
+		_palm(k, rng, p)
+		trees.append(Vector3(cx + p.x, cz + p.z, 0.3))
+
+
+func _palm(k: MeshKit, rng: RandomNumberGenerator, p: Vector3) -> void:
+	var hgt := rng.randf_range(6.0, 9.0)
+	var lean := Vector3(rng.randf_range(-0.8, 0.8), 0, rng.randf_range(-0.8, 0.8))
+	var top := p + Vector3.UP * hgt + lean
+	k.beam(p, top, 0.42, 0.42, Color(0.36, 0.25, 0.16), 0.08)
+	var green := Color(0.2, 0.32, 0.12)
+	var green2 := Color(0.26, 0.38, 0.14)
+	for i in 9:
+		var a := TAU * i / 9.0 + rng.randf() * 0.3
+		var dir := Vector3(cos(a), 0, sin(a))
+		var mid := top + dir * 2.0 + Vector3.UP * 0.6
+		var tip := top + dir * 3.6 - Vector3.UP * 0.9
+		k.beam(top, mid, 0.7, 0.06, green if i % 2 else green2, 0.0, Vector3.UP)
+		k.beam(mid, tip, 0.5, 0.05, green2 if i % 2 else green, 0.0, Vector3.UP)
+	k.box(top - Vector3.UP * 0.4, Vector3(0.7, 0.6, 0.7), Color(0.55, 0.32, 0.1), 0.15)   # dates
+
+
+func _outcrop(k: MeshKit, rng: RandomNumberGenerator, cx: float, cz: float) -> void:
+	var cols := [Color(0.45, 0.28, 0.19), Color(0.52, 0.33, 0.22), Color(0.4, 0.25, 0.17)]
+	for i in rng.randi_range(4, 7):
+		var sz := Vector3(rng.randf_range(5, 11), rng.randf_range(6, 18), rng.randf_range(5, 11))
+		var off := Vector3(rng.randf_range(-9, 9), 0, rng.randf_range(-9, 9))
+		off.y = sz.y * 0.4 - 1.0
+		k.box(off, sz, cols[i % 3], 1.4, Basis.from_euler(Vector3(rng.randf_range(-0.12, 0.12), rng.randf() * TAU, rng.randf_range(-0.12, 0.12))), cols[(i + 1) % 3].lightened(0.15))
+		trees.append(Vector3(cx + off.x, cz + off.z, minf(sz.x, sz.z) * 0.45))
+
+
+func _well(k: MeshKit, cx: float, cz: float) -> void:
+	var stone := Color(0.42, 0.36, 0.3)
+	for i in 10:
+		var a := TAU * i / 10.0
+		k.box(Vector3(cos(a) * 1.3, 0.45, sin(a) * 1.3), Vector3(0.75, 0.9, 0.5), stone if i % 2 else stone.darkened(0.15), 0.08, Basis(Vector3.UP, -a))
+	k.cyl(Vector3(0, 0.6, 0), Vector3.UP, 1.0, 1.0, 0.05, 12, Color(0.05, 0.05, 0.06))
+	var wood := Color(0.3, 0.2, 0.12)
+	k.beam(Vector3(-1.4, 0, 0), Vector3(-1.2, 3.0, 0), 0.16, 0.16, wood)
+	k.beam(Vector3(1.4, 0, 0), Vector3(1.2, 3.0, 0), 0.16, 0.16, wood)
+	k.beam(Vector3(-1.4, 2.9, 0), Vector3(1.4, 2.9, 0), 0.18, 0.18, wood)
+	k.cyl(Vector3(0, 2.9, 0), Vector3.RIGHT, 0.28, 0.28, 0.5, 8, wood.darkened(0.2))
+	trees.append(Vector3(cx, cz, 1.7))

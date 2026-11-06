@@ -333,17 +333,14 @@ func _place_arrow(target, in_cab: bool) -> void:
 	var d: Vector3 = target - car.pos
 	var dist := Vector2(d.x, d.z).length()
 	arrow_lbl.text = "%d م" % int(dist) if dist < 1000.0 else "%.1f كم" % (dist / 1000.0)
-	if not table.is_empty():
-		# on the table: off the disc, a pin on the rim points the way; on the disc the beam shows it
-		var v: Vector3 = target - table.view
-		var off: float = Vector2(v.x, v.z).length() * table.s
-		var dir := Vector3(v.x, 0, v.z).normalized()
-		var c: Vector3 = table.c
-		if off < table.r * 0.92:
-			arrow.visible = false
-			return
-		arrow.global_transform = Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z)).scaled(Vector3.ONE * 0.28), c + dir * (table.r + 0.06) + Vector3.UP * 0.03)
+	if table.has("sky"):
+		# seen from high up: a big arrow floats over the car, pointing the way
+		var sc: float = clampf(0.12 / table.s, 6.0, 22.0)
+		arrow.top_level = false
+		var dir := Vector3(d.x, 0, d.z).normalized()
+		arrow.transform = Transform3D(Basis(Vector3.UP, atan2(d.x, d.z)).scaled(Vector3.ONE * sc), car.pos + dir * (3.5 + sc * 0.35) + Vector3.UP * 2.5)
 		return
+	arrow.top_level = true
 	var at := car.pos + Vector3.UP * 3.3
 	if in_cab:
 		at = car.pos + Basis.from_euler(Vector3(-car.pitch, car.h, car.roll), EULER_ORDER_YXZ) * Vector3(0.0, 1.62, 1.35)

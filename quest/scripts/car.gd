@@ -139,17 +139,18 @@ func _step(dt: float, gas: float, brake: float, steer_in: float) -> void:
 	h += yaw_rate * dt
 	pos.x += vel.x * dt
 	pos.z += vel.z * dt
-	# acacia trunks stop the car
+	# acacia trunks, houses and rocks stop the car (circles: x, z, radius)
 	for tr in terrain.trees:
 		var dx := pos.x - tr.x
 		var dz := pos.z - tr.y
-		if absf(dx) > 3.0 or absf(dz) > 3.0:
+		var rr: float = tr.z + 1.4
+		if absf(dx) > rr or absf(dz) > rr:
 			continue
 		var d := sqrt(dx * dx + dz * dz)
-		if d < 1.6 and d > 0.001:
+		if d < rr and d > 0.001:
 			var nn := Vector3(dx / d, 0, dz / d)
-			pos.x += nn.x * (1.6 - d)
-			pos.z += nn.z * (1.6 - d)
+			pos.x += nn.x * (rr - d)
+			pos.z += nn.z * (rr - d)
 			var vn := vel.dot(nn)
 			if vn < 0.0:
 				if vn < -4.0:
