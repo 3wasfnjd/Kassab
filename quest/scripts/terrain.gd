@@ -132,16 +132,14 @@ render_mode cull_back;
 uniform sampler2D grain : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D ripples : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform mat4 world_inv;     // scene -> game world (the table view scales and moves the world)
-uniform vec3 clip_c;
-uniform float clip_r = 1.0e9;
-varying vec3 clip_wp;
+""" + MeshKit.CLIP + """
 varying vec3 gw;
 void vertex() {
 	clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	gw = (world_inv * vec4(clip_wp, 1.0)).xyz;
 }
 void fragment() {
-	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	if (clipped(clip_wp, FRAGCOORD.xy)) { discard; }
 	vec2 uv = gw.xz * 0.22;
 	float g = texture(grain, uv).r;
 	ALBEDO = COLOR.rgb * g;
@@ -446,3 +444,13 @@ func _well(k: MeshKit, cx: float, cz: float) -> void:
 	k.beam(Vector3(-1.4, 2.9, 0), Vector3(1.4, 2.9, 0), 0.18, 0.18, wood)
 	k.cyl(Vector3(0, 2.9, 0), Vector3.RIGHT, 0.28, 0.28, 0.5, 8, wood.darkened(0.2))
 	trees.append(Vector3(cx, cz, 1.7))
+
+
+
+## In the room view only the sand near the car is drawn: hide whole chunks far from it.
+func show_only_near(x: float, z: float, r: float) -> void:
+	for k in chunks:
+		var c: Node3D = chunks[k]
+		var cx: float = c.get_meta("x0", 0.0) + CHUNK * 0.5
+		var cz: float = c.get_meta("z0", 0.0) + CHUNK * 0.5
+		c.visible = r <= 0.0 or Vector2(cx - x, cz - z).length() < r + CHUNK * 0.75

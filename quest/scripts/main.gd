@@ -1,13 +1,16 @@
 extends Node3D
 ## Kassab Quest. A desert of dunes and gravel plains and one code-built 4x4.
-## Main view: you float high above an open desert that reaches the horizon all around you and
+## First view (AR): the car drives on your real floor through passthrough, toy-sized, free in
+## every direction; only the sand around it is drawn, fading into your room. If it runs too far
+## from you the sand quietly slides it back within reach.
+## Second view: you float high above an open desert that reaches the horizon all around you and
 ## watch the car from above, like a top-down game. The world is shown smaller than life (you are
 ## a giant) so the land glides slowly under you; the view only slides, it never turns or tilts
-## (comfort). Second view: the driver's seat.
+## (comfort). Third view: the driver's seat.
 ##
 ## Controls (Quest Touch): right trigger gas · left trigger brake / reverse · left stick steer
 ## right grip handbrake · right stick up/down height (sky) or seat height (seat)
-## A switch view (sky / seat) · Y 4x4 on/off · X photo · B put the car back on its wheels
+## A switch view (room AR / sky / seat) · Y 4x4 on/off · X photo · B put the car back on its wheels
 ## Desktop (for development): W/S gas/brake · A/D steer · C view · F 4x4 · R reset · Q/E zoom.
 
 var terrain: Terrain
@@ -25,7 +28,16 @@ var xr_cam: XRCamera3D
 var left: XRController3D
 var right: XRController3D
 var cam: Camera3D           # desktop camera
-var view := "sky"           # "sky" = high above, "in" = driver's seat
+var view := "ar"            # "ar" = in your room, "sky" = high above, "in" = driver's seat
+var xri: XRInterface
+var ar_ok := false          # passthrough available
+var eye_h := 0.0            # head height over the floor when a VR view started (stage space)
+var ar_p := Vector3.ZERO    # the room point where view_c sits (on the floor)
+var ar_zoom := 1.0 / 25.0   # room view scale (1/25: a 4.5 m car is 18 cm)
+const AR_PATCH := 1.15      # metres of sand drawn around the car in the room
+const AR_REACH := 2.5       # the car may roam this far from you before the sand slides
+var fake_floor: MeshInstance3D
+var ar_fix := 1.2          # re-place the car once the headset pose has settled
 var world: Node3D           # everything of the desert; scaled and slid in the sky view
 const ANCHOR := Vector3(0.0, -1.35, -1.25)   # where the car's ground sits, from where your head started
 var zoom := 1.0 / 14.0      # world scale in the sky view (1/14: a 4.5 m car is 32 cm)
@@ -75,8 +87,18 @@ func _ready() -> void:
 	world.add_child(missions)
 	missions.attach_hud(xr_cam if xr_on else cam)
 	missions.said.connect(_say)
-	view = shot.get("view", "sky")
+	view = shot.get("view", "ar")
 	view_c = Vector3(car.pos.x, 0, car.pos.z)
+	if not xr_on:   # development shots: a grey floor stands in for the room
+		fake_floor = MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(12, 12)
+		fake_floor.mesh = pm
+		var fm := StandardMaterial3D.new()
+		fm.albedo_color = Color(0.45, 0.45, 0.47)
+		fake_floor.material_override = fm
+		fake_floor.position.y = -0.002
+		add_child(fake_floor)
 	_apply_view_mode()
 	if shot.has("notip"):
 		tip.visible = false
@@ -163,13 +185,16 @@ func _face_dunes(p: Vector3) -> float:
 
 # ---------------------------------------------------------------- player rig
 func _rig() -> void:
-	var xri := XRServer.find_interface("OpenXR")
+	xri = XRServer.find_interface("OpenXR")
 	if xri and xri.is_initialized() and not shot.has("shot"):
+		ar_ok = xri.get_supported_environment_blend_modes().has(XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND)
 		xr_on = true
 		get_viewport().use_xr = true
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		if xri.has_signal("pose_recentered"):
-			xri.connect("pose_recentered", func(): XRServer.center_on_hmd(XRServer.RESET_BUT_KEEP_TILT, true))
+			xri.connect("pose_recentered", func():
+				XRServer.center_on_hmd(XRServer.RESET_BUT_KEEP_TILT, true)
+				ar_fix = 0.3)
 		if xri.has_signal("session_begun"):
 			xri.connect("session_begun", func(): XRServer.center_on_hmd(XRServer.RESET_BUT_KEEP_TILT, true))
 		if xri.has_method("set_display_refresh_rate"):
@@ -263,6 +288,8 @@ func _read_input() -> Dictionary:
 		hb = right.get_float("grip") > 0.6 and not grab.has(right)
 		if view == "in":
 			seat_dy = clampf(seat_dy + v2.y * 0.004, -0.2, 0.2)   # right stick up/down: seat height
+		elif absf(v2.y) > 0.3 and view == "ar":
+			ar_zoom = clampf(ar_zoom * exp(v2.y * 0.02), 1.0 / 60.0, 1.0 / 10.0)
 		elif absf(v2.y) > 0.3:
 			zoom = clampf(zoom * exp(-v2.y * 0.02), 1.0 / 40.0, 1.0 / 6.0)
 		b_view = right.is_button_pressed("ax_button")
@@ -303,15 +330,18 @@ func _pulse(ctrl: XRController3D, amp: float, dur: float) -> void:
 func _process(dt: float) -> void:
 	var inp := _read_input()
 	if inp.view:
-		view = "sky" if view == "in" else "in"
+		var order := ["ar", "sky", "in"] if (ar_ok or not xr_on) else ["sky", "in"]
+		view = order[(order.find(view) + 1) % order.size()]
 		_apply_view_mode()
-		_say("من فوق" if view == "sky" else "ورا الدركسون", 1.2)
+		_say({"ar": "في غرفتك", "sky": "من فوق", "in": "ورا الدركسون"}[view], 1.2)
 	if inp.awd:
 		car.awd = not car.awd
 		_say("الدبل شغّال 4×4" if car.awd else "الدبل طافي", 1.6)
 		_pulse(left, 0.4, 0.08)
 	if inp.reset:
 		car.place(car.pos + Vector3.UP * 0.2, car.h)
+		if view == "ar":
+			ar_fix = 0.05   # and bring it back in front of you
 		_say("رجّعنا السيارة على كفراتها", 1.6)
 	var st: float = inp.steer
 	var ws = _wheel_grab()
@@ -339,6 +369,7 @@ func _process(dt: float) -> void:
 	missions.update(dt, inp.photo, view == "in")
 	fx.update(car, terrain)
 	terrain.update_around(view_c.x if view == "sky" else car.pos.x, view_c.z if view == "sky" else car.pos.z, 1)
+	terrain.show_only_near(car.pos.x, car.pos.z, AR_PATCH / ar_zoom if view == "ar" else 0.0)
 	sun.global_position = car.pos
 	if not _shot_done:
 		_place_view(dt)
@@ -350,6 +381,10 @@ func _process(dt: float) -> void:
 
 
 func _place_view(dt: float) -> void:
+	if view == "ar":
+		_update_ar(dt)
+		vig_mat.set_shader_parameter("strength", 0.0)
+		return
 	if view == "sky":
 		_update_sky(dt)
 		vig_mat.set_shader_parameter("strength", 0.0)
@@ -360,7 +395,7 @@ func _place_view(dt: float) -> void:
 	var t := Transform3D(b * Basis(Vector3.UP, PI), eye)   # the camera looks down its -Z
 	var vig := clampf((absf(car.yaw_rate) - 0.45) * 0.5, 0.0, 0.6) + (0.3 if car.air else 0.0)
 	if xr_on:
-		origin.global_transform = t
+		origin.global_transform = t * Transform3D(Basis.IDENTITY, Vector3(0, -eye_h, 0))
 	else:
 		cam.global_transform = t
 	vig_now = lerpf(vig_now, vig, minf(1.0, dt * 6.0))
@@ -370,14 +405,37 @@ func _place_view(dt: float) -> void:
 
 # ---------------------------------------------------------------- the sky view
 func _apply_view_mode() -> void:
+	if view == "ar" and xr_on and not ar_ok:
+		view = "sky"
+	var ar := view == "ar"
 	var sky := view == "sky"
-	model.speedo.visible = not sky
+	model.speedo.visible = view == "in"
 	MeshKit.set_clip(Vector3.ZERO, 1.0e9)
-	if sky:
+	# passthrough: see-through background, no sky, no haze
+	get_viewport().transparent_bg = ar
+	env.background_mode = Environment.BG_COLOR if ar else Environment.BG_SKY
+	env.background_color = Color(0, 0, 0, 0)
+	env.fog_enabled = not ar
+	if xr_on and ar_ok:
+		xri.environment_blend_mode = XRInterface.XR_ENV_BLEND_MODE_ALPHA_BLEND if ar else XRInterface.XR_ENV_BLEND_MODE_OPAQUE
+	if fake_floor:
+		fake_floor.visible = ar and not xr_on
+	# the VR views put your eyes where the old local space had them
+	eye_h = 1.6
+	if xr_on and xr_cam.position.y > 0.4:
+		eye_h = xr_cam.position.y
+	if ar:
+		engine.volume_db = -12.0
+		env.tonemap_exposure = 0.95
+		sun.directional_shadow_max_distance = 6.0
+		if xr_on:
+			origin.global_transform = Transform3D.IDENTITY
+		_ar_anchor()
+	elif sky:
 		engine.volume_db = -9.0
 		env.tonemap_exposure = 0.85
 		if xr_on:
-			origin.global_transform = Transform3D.IDENTITY
+			origin.global_transform = Transform3D(Basis.IDENTITY, Vector3(0, -eye_h, 0))
 	else:
 		world.transform = Transform3D.IDENTITY
 		terrain.mat.set_shader_parameter("world_inv", Transform3D.IDENTITY)
@@ -386,6 +444,53 @@ func _apply_view_mode() -> void:
 		sun.directional_shadow_max_distance = 30.0
 		engine.volume_db = -6.0
 		env.tonemap_exposure = 0.92
+
+
+# ---------------------------------------------------------------- the room view (passthrough AR)
+func _head() -> Transform3D:
+	return xr_cam.global_transform if xr_on else cam.global_transform
+
+
+## Put the car on the floor a little in front of you.
+func _ar_anchor() -> void:
+	var h := _head()
+	var f := -h.basis.z
+	f.y = 0.0
+	f = f.normalized() if f.length() > 0.1 else Vector3.FORWARD
+	ar_p = Vector3(h.origin.x, 0.0, h.origin.z) + f * 1.3
+	view_c = car.pos - Vector3.UP * 0.3
+
+
+func _update_ar(dt: float) -> void:
+	if ar_fix > 0.0:
+		ar_fix -= dt
+		if ar_fix <= 0.0:
+			_ar_anchor()
+	var z := ar_zoom
+	# the ground under the car settles on your floor (slowly, so dunes still rise and fall)
+	# (the lowest sand around the car rests on the floor, so the patch never sinks into it)
+	var low := car.pos.y
+	var rw := AR_PATCH / z * 0.7
+	for i in 8:
+		var a := TAU * i / 8.0
+		low = minf(low, terrain.height_at(car.pos.x + cos(a) * rw, car.pos.z + sin(a) * rw))
+	view_c.y += (low - 0.3 - view_c.y) * (1.0 - exp(-dt * 1.5))
+	var cs := ar_p + (car.pos - view_c) * z   # the car in the room
+	# free to roam; past arm's reach the sand slides it back toward you
+	var hp := _head().origin
+	var off := Vector2(cs.x - hp.x, cs.z - hp.z)
+	if off.length() > AR_REACH:
+		var push := off.normalized() * (off.length() - AR_REACH) * (1.0 - exp(-dt * 2.5))
+		view_c.x += push.x / z
+		view_c.z += push.y / z
+	world.transform = Transform3D(Basis.from_scale(Vector3.ONE * z), ar_p - view_c * z)
+	terrain.mat.set_shader_parameter("world_inv", world.transform.affine_inverse())
+	cs = ar_p + (car.pos - view_c) * z
+	MeshKit.set_clip(cs, AR_PATCH)
+	missions.table = {sky = true, s = z * 1.6}
+	if not xr_on:
+		cam.global_position = Vector3(0, 1.45, 0.3)
+		cam.look_at(ar_p + Vector3(0, 0, 0.2))
 
 
 func _update_sky(dt: float) -> void:

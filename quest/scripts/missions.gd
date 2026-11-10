@@ -420,12 +420,6 @@ func _build_camp() -> void:
 	fire.material_override = MeshKit.flat_material(Color(1.0, 0.55, 0.15))
 	fire.position = c + Vector3(0, 0.35, 6.0)
 	add_child(fire)
-	var lamp := OmniLight3D.new()
-	lamp.light_color = Color(1.0, 0.6, 0.25)
-	lamp.omni_range = 8.0
-	lamp.light_energy = 1.2
-	lamp.position = c + Vector3(0, 0.8, 6.0)
-	add_child(lamp)
 
 
 func _tent(c: Vector3, s: float) -> Node3D:

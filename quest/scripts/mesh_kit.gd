@@ -227,6 +227,14 @@ const CLIP := """
 uniform vec3 clip_c;
 uniform float clip_r = 1.0e9;
 varying vec3 clip_wp;
+// true = drop this fragment: outside the round window, with a dithered soft edge (no blending)
+bool clipped(vec3 p, vec2 fc) {
+	float d = length(p.xz - clip_c.xz) / clip_r;
+	if (d > 1.0) { return true; }
+	float t = smoothstep(0.6, 1.0, d);
+	float n = fract(52.9829189 * fract(dot(fc, vec2(0.06711056, 0.00583715))));
+	return n < t;
+}
 """
 
 
@@ -256,7 +264,7 @@ uniform float emit = 0.0;
 uniform vec4 tint : source_color = vec4(1.0);
 void vertex() { clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
-	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	if (clipped(clip_wp, FRAGCOORD.xy)) { discard; }
 	ALBEDO = COLOR.rgb * tint.rgb;
 	ROUGHNESS = rough;
 	METALLIC = metal;
@@ -281,7 +289,7 @@ static func flat_material(col: Color, add := false) -> ShaderMaterial:
 uniform vec4 col : source_color = vec4(1.0);
 void vertex() { clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
-	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	if (clipped(clip_wp, FRAGCOORD.xy)) { discard; }
 	ALBEDO = col.rgb;
 	ALPHA = col.a;
 }

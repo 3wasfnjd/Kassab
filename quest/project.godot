@@ -55,8 +55,9 @@ environment/defaults/default_clear_color=Color(0.86, 0.78, 0.66, 1)
 [xr]
 
 openxr/enabled=true
-openxr/reference_space=0
+openxr/reference_space=1
 openxr/environment_blend_mode=0
+openxr/extensions/meta/passthrough=true
 openxr/foveation_level=2
 openxr/foveation_dynamic=true
 openxr/startup_alert=false

@@ -34,7 +34,7 @@ func _init() -> void:
 	sh.code = "shader_type spatial;\nrender_mode unshaded, depth_draw_never, shadows_disabled;\n" + MeshKit.CLIP + """
 void vertex() { clip_wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
 void fragment() {
-	if (length(clip_wp.xz - clip_c.xz) > clip_r) { discard; }
+	if (clipped(clip_wp, FRAGCOORD.xy)) { discard; }
 	ALBEDO = COLOR.rgb;
 	ALPHA = COLOR.a;
 }
