@@ -8,8 +8,9 @@ extends Node3D
 ##   right trigger gas · left trigger brake, and reverse once stopped · left stick steer
 ##   right grip handbrake · Y 4x4 · X traction control (off = drift mode) · B back on its wheels
 ##   A bring the truck in front of you · right stick up/down: bigger / smaller · left grip horn
+##   left stick click: wheel-well lights on/off
 ## Desktop (development): W/S gas/brake · A/D steer · Space handbrake · F 4x4 · T traction ·
-##   R reset · G bring back · Q/E size · H horn.
+##   R reset · G bring back · Q/E size · H horn · L wheel-well lights.
 
 const SKIP_LABELS := ["floor", "ceiling", "wall_face", "invisible_wall_face", "global_mesh",
 		"window_frame", "door_frame", "wall_art", "inner_wall_face"]
@@ -64,6 +65,9 @@ func _ready() -> void:
 		zoom = 1.0 / float(shot.zoom)
 	if shot.has("awd"):
 		truck.awd = true
+	if shot.has("dark"):
+		env.ambient_light_energy = 0.08
+		sun.light_energy = 0.05
 	if not xr_on:
 		_desktop_room()
 	_furniture_start()
@@ -269,6 +273,7 @@ func _read_input() -> Dictionary:
 	var b_tcs := false
 	var b_reset := false
 	var b_home := false
+	var b_lights := false
 	var dz := 0.0
 	if xr_on:
 		gas = right.get_float("trigger")
@@ -286,6 +291,7 @@ func _read_input() -> Dictionary:
 		b_reset = right.is_button_pressed("by_button")
 		b_tcs = left.is_button_pressed("ax_button")
 		b_awd = left.is_button_pressed("by_button")
+		b_lights = left.is_button_pressed("primary_click")
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
 		gas = 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -300,6 +306,7 @@ func _read_input() -> Dictionary:
 	b_tcs = b_tcs or Input.is_key_pressed(KEY_T)
 	b_reset = b_reset or Input.is_key_pressed(KEY_R)
 	b_home = b_home or Input.is_key_pressed(KEY_G)
+	b_lights = b_lights or Input.is_key_pressed(KEY_L)
 	if Input.is_key_pressed(KEY_Q):
 		dz = -1.0
 	if Input.is_key_pressed(KEY_E):
@@ -309,7 +316,7 @@ func _read_input() -> Dictionary:
 		st = float(shot.get("steer", "0"))
 		hand = shot.has("hand") and _shot_t > float(shot.get("hand", "0")) and _shot_t < float(shot.get("hand", "0")) + float(shot.get("hold", "9"))
 	return {gas = gas, brake = brake, steer = st, hand = hand, horn = horn, dz = dz,
-		awd = _pressed("awd", b_awd), tcs = _pressed("tcs", b_tcs), reset = _pressed("reset", b_reset), home = _pressed("home", b_home)}
+		awd = _pressed("awd", b_awd), tcs = _pressed("tcs", b_tcs), reset = _pressed("reset", b_reset), home = _pressed("home", b_home), lights = _pressed("lights", b_lights)}
 
 
 # ---------------------------------------------------------------- frame
@@ -326,6 +333,9 @@ func _process(dt: float) -> void:
 		_pulse(right, 0.4, 0.06)
 	if inp.home:
 		_bring_back()
+	if inp.lights:
+		model.set_lights(not model.lights_on)
+		_pulse(left, 0.4 if model.lights_on else 0.2, 0.06)
 	if place_t > 0.0:
 		place_t -= dt
 		if place_t <= 0.0:
@@ -359,6 +369,7 @@ func _process(dt: float) -> void:
 	model.apply(truck, braking)
 	fx.update(truck, dt)
 	world.transform = Transform3D(Basis.from_scale(Vector3.ONE * zoom), anchor)
+	model.set_world_scale(zoom)
 	if shot.has("shot"):
 		_shot_tick(dt)
 

@@ -43,14 +43,14 @@ const DROOP := 0.22
 const BUMP := -0.10                    # the tyre meets the wheel-well liner here
 const K_STOP := 400000.0
 
-# drivetrain (6.2 L V8 class: ~620 N·m, ~310 kW)
+# drivetrain (6.2 L V8, supercharged: see engine_torque)
 const IDLE := 750.0
 const REDLINE := 6000.0
 const GEARS := [4.03, 2.36, 1.53, 1.15, 0.85, 0.67]
 const REVERSE := 3.6
 const FINAL := 3.42
 const EFF := 0.86
-const VMAX := 50.0                     # governor, 180 km/h
+const VMAX := 63.9                     # governor, 230 km/h (tuned)
 const BRAKE_T := [4200.0, 2600.0]      # max brake torque per wheel N·m
 const HAND_T := 9000.0
 const CDA := 1.53                      # drag area (Cd 0.45 x 3.4 m²)
@@ -368,7 +368,8 @@ func _steer_angles(vl: float) -> void:
 
 ## Engine torque curve (N·m at full throttle).
 static func engine_torque(r: float) -> float:
-	var pts := [[600.0, 380.0], [1000.0, 430.0], [2000.0, 545.0], [3000.0, 600.0], [4100.0, 624.0], [5600.0, 530.0], [6200.0, 450.0]]
+	# the 6.2 V8 with a supercharger tune (+40 % torque, ~870 N·m / ~440 kW)
+	var pts := [[600.0, 530.0], [1000.0, 600.0], [2000.0, 760.0], [3000.0, 840.0], [4100.0, 873.0], [5600.0, 745.0], [6200.0, 630.0]]
 	if r <= pts[0][0]:
 		return pts[0][1]
 	for k in range(1, pts.size()):

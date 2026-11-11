@@ -61,7 +61,7 @@ parts = [('Body', body_t, np.zeros(3), np.zeros(3))]
 # the source's front wheel wells have no inner liner (the fused tyre closed them): give each one
 # a plain dark liner — a half-cylinder over the tyre out to the flare, and an inner wall
 def shell(sx):
-    rr, x0, x1 = 0.112, 0.118, 0.236
+    rr, x0, x1 = 0.112, 0.118, 0.198   # stays inside the fender (the tyres stick out past it)
     yc = rear['RL'][1][1]
     angs = np.radians(np.linspace(22, 158, 36))
     verts = []; tris = []

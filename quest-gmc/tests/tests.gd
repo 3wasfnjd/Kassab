@@ -116,7 +116,7 @@ func _test_accel_brake() -> void:
 			tp.update(DT, 1.0, 0.0, 0.0)
 			t100 += DT
 		var lim := 7.5 if awd else 10.5
-		check(t100 > 5.0 and t100 < lim, "0-100 km/h in %.1f s (%s, traction control on)" % [t100, "4x4" if awd else "rear-drive"])
+		check(t100 > 3.5 and t100 < lim, "0-100 km/h in %.1f s (%s, traction control on)" % [t100, "4x4" if awd else "rear-drive"])
 	var tr := _truck()
 	_to_speed(tr, 100.0)
 	var h0 := tr.heading()
@@ -132,7 +132,7 @@ func _test_accel_brake() -> void:
 	check(tr.gear == -1 and tr.v_long() < -1.5, "left trigger held when stopped backs up (%.1f m/s)" % tr.v_long())
 	var t2 := _truck()
 	_run(t2, 22.0, 1.0, 0.0, 0.0)
-	check(t2.speed() * 3.6 > 150.0 and t2.speed() * 3.6 < 182.0, "flat out for 22 s: %d km/h, gear %d (governed at 180)" % [int(t2.speed() * 3.6), t2.gear])
+	check(t2.speed() * 3.6 > 185.0 and t2.speed() * 3.6 < 232.0, "flat out for 22 s: %d km/h, gear %d (governed at 230)" % [int(t2.speed() * 3.6), t2.gear])
 
 
 func _test_drift() -> void:
