@@ -1,0 +1,57 @@
+name: Kassab GMC AR APK · جمس الواقع المختلط
+# Builds, tests and verifies the Meta Quest 3 passthrough app quest-gmc/ (the GMC drifting and
+# dune-bashing on your room floor) on the quest-gmc-ar branch. The APK is kept as a run artifact
+# and attached to the «gmc-ar-latest» pre-release, so the newest build always has the same
+# direct download link.
+on:
+  push:
+    branches: [quest-gmc-ar]
+    paths: ['quest-gmc/**', '.github/workflows/quest-gmc-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: kassab-gmc-ar-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/kassab-godot
+          key: godot-4.6.3-stable-v1
+      - name: Build, test and verify APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          OUT_DIR: ${{ github.workspace }}/build
+        run: bash quest-gmc/tools/ci/build_apk.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kassab-gmc-ar-${{ github.run_number }}
+          path: |
+            build/*.apk
+            build/*.sha256
+            build/*.txt
+            build/export.log
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Direct download link (gmc-ar-latest pre-release)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          cp "$APK" build/kassab-gmc-ar.apk
+          gh release view gmc-ar-latest -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create gmc-ar-latest -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "Kassab GMC AR — آخر نسخة للتجربة" --notes "أحدث ملف APK لجمس كساب في وضع الواقع المختلط على Meta Quest 3 (موقّع بمفتاح التجربة، للتثبيت الجانبي فقط)."
+          gh release upload gmc-ar-latest build/kassab-gmc-ar.apk -R "$GITHUB_REPOSITORY" --clobber
+          echo "::notice::https://github.com/$GITHUB_REPOSITORY/releases/download/gmc-ar-latest/kassab-gmc-ar.apk"
