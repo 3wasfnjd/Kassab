@@ -1,5 +1,6 @@
 extends SceneTree
-# writes res://lod_<name>.bin (uint32 LOD indices into the part's own vertex list) for the chosen LOD
+# Godot's meshoptimizer LODs for the textured parts of gmc_split.glb (split.py).
+# writes res://lod_<i>.bin (uint32 LOD indices into the part's own vertex list) for the chosen LOD
 func _init():
 	var level := int(OS.get_cmdline_user_args()[0]) if OS.get_cmdline_user_args().size() > 0 else 0
 	var d := GLTFDocument.new(); var s := GLTFState.new()
@@ -7,6 +8,8 @@ func _init():
 	var nodes := s.get_nodes()
 	for i in s.get_meshes().size():
 		var im: ImporterMesh = s.get_meshes()[i].mesh
+		if im.get_surface_arrays(0)[Mesh.ARRAY_TEX_UV] == null:
+			continue   # the plain well liners: copied as they are
 		im.generate_lods(25, 60, [])
 		var idx: PackedInt32Array = im.get_surface_lod_indices(0, level)
 		var f := FileAccess.open(ProjectSettings.globalize_path("res://lod_%d.bin" % i), FileAccess.WRITE)

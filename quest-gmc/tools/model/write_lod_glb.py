@@ -3,7 +3,6 @@
 import numpy as np, json, struct, sys
 vd, split_glb, out = sys.argv[1:4]
 f = open(split_glb, 'rb'); f.read(12); l, _ = struct.unpack('<II', f.read(8)); src = json.loads(f.read(l))
-names = [n['name'] for n in src['nodes'] if 'mesh' in n]; trans = [n['translation'] for n in src['nodes'] if 'mesh' in n]
 bl, _ = struct.unpack('<II', f.read(8)); sbuf = f.read(bl)
 ib = src['bufferViews'][src['images'][0]['bufferView']]
 img = sbuf[ib.get('byteOffset', 0):ib.get('byteOffset', 0) + ib['byteLength']]   # the original JPEG, byte for byte
@@ -16,7 +15,30 @@ def add(arr, target=None):
     if target: v['target'] = target
     views.append(v); return len(views) - 1
 tot = 0
-for i, (name, t) in enumerate(zip(names, trans)):
+import os
+def src_acc(i):
+    a = src['accessors'][i]; bv = src['bufferViews'][a['bufferView']]
+    n = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3}[a['type']]
+    dt = {5126: np.float32, 5125: np.uint32}[a['componentType']]
+    o = bv.get('byteOffset', 0) + a.get('byteOffset', 0)
+    r = np.frombuffer(sbuf, dt, a['count'] * n, o)
+    return r.reshape(-1, n) if n > 1 else r
+src_nodes = [n for n in src['nodes'] if 'mesh' in n]
+for i, sn in enumerate(src_nodes):
+    name = sn['name']
+    sm = src['meshes'][sn['mesh']]['primitives'][0]
+    if not os.path.exists(f'{vd}/lod_{i}.bin'):      # untextured liner: copy as it is
+        pos = src_acc(sm['attributes']['POSITION']).copy(); idx = src_acc(sm['indices']).copy()
+        a0 = len(accs)
+        accs.append({'bufferView': add(pos, 34962), 'componentType': 5126, 'count': len(pos), 'type': 'VEC3', 'min': pos.min(0).tolist(), 'max': pos.max(0).tolist()})
+        accs.append({'bufferView': add(idx, 34963), 'componentType': 5125, 'count': len(idx), 'type': 'SCALAR'})
+        meshes.append({'name': name, 'primitives': [{'attributes': {'POSITION': a0}, 'indices': a0 + 1, 'material': sm['material']}]})
+        nd = {'name': name, 'mesh': len(meshes) - 1}
+        if 'translation' in sn: nd['translation'] = sn['translation']
+        nodes.append(nd)
+        print(name, len(pos), 'verts', len(idx) // 3, 'tris (copied)')
+        continue
+    t = sn.get('translation', [0, 0, 0])
     raw = open(f'{vd}/v_{i}.bin', 'rb').read(); idx = np.fromfile(f'{vd}/lod_{i}.bin', np.uint32)
     nv = len(raw) // 32  # 12 + 12 + 8 bytes per vertex
     a = np.frombuffer(raw, np.float32)

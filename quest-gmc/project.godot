@@ -59,6 +59,9 @@ openxr/enabled=true
 openxr/reference_space=1
 openxr/environment_blend_mode=0
 openxr/extensions/meta/passthrough=true
+; room furniture (Space Setup) as obstacles for the truck
+openxr/extensions/meta/scene_api=true
+openxr/extensions/meta/anchor_api=true
 openxr/foveation_level=2
 openxr/foveation_dynamic=true
 openxr/startup_alert=false

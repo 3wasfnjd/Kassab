@@ -239,6 +239,8 @@ echo "$MIN_SDK_LINE" | grep -q "'32'" || { echo "::error::APK minSdk is not 32 (
 unzip -l "$APK" | grep -q "vr_splash" || { echo "::error::APK check failed: unzip -l \$APK | grep -q vr_splash"; exit 1; }
 # Passthrough (the whole app is mixed reality): the Meta passthrough feature must be declared.
 "$BT/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q "com.oculus.feature.PASSTHROUGH" || { echo "::error::APK check failed: passthrough feature missing from the manifest"; exit 1; }
+# Room furniture (Space Setup) needs the scene permission in the manifest.
+"$BT/aapt2" dump permissions "$APK" | grep -q "com.oculus.permission.USE_SCENE" || { echo "::error::APK check failed: com.oculus.permission.USE_SCENE missing"; exit 1; }
 echo "::notice::$("$BT/aapt2" dump badging "$APK" | grep -E "^package:|sdkVersion|uses-permission" | tr "\n" " " | cut -c1-900)"
 sha256sum "$APK" | tee "$APK.sha256"
 echo "APK=$APK" >> "${GITHUB_ENV:-/dev/null}"

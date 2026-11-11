@@ -1,7 +1,7 @@
 class_name Truck
 extends RefCounted
-## The GMC's driving model. A rigid body (all six degrees of freedom) on the analytic desert
-## ground (Terrain.height_at / normal_at / soft_at), four spring-damper wheels with anti-roll
+## The GMC's driving model. A rigid body (all six degrees of freedom) on a ground object
+## (height_at / normal_at / soft_at: FloorGround: your room floor; soft_at > 0 would be loose sand), four spring-damper wheels with anti-roll
 ## bars, tyres whose grip follows Pacejka-shaped slip curves inside a friction circle, a V8 with a
 ## torque converter and a 6-speed automatic, open differentials, rear-drive or 4x4, ABS brakes and
 ## a handbrake that locks the rear wheels (drift).
@@ -20,14 +20,14 @@ const G := 9.81
 const MASS := 2400.0
 const INERTIA := Vector3(5450.0, 5800.0, 1250.0)   # about model X (pitch), Y (yaw), Z (roll)
 const COM := Vector3(0.0, 0.85, 0.40)             # centre of mass (57 % of the weight on the front axle)
-const R := 0.485                                  # tyre radius
+const R := 0.457                                  # tyre radius (measured from the model's tyres)
 const IW := 3.2                                   # wheel + tyre + brake disc inertia
 # wheel hubs at rest, model space — the same numbers as the wheel nodes in models/gmc.glb
 # (tools/model/split.py); a test checks they match. Order: FL, FR, RL, RR.
-const HUBS := [Vector3(0.985, 0.485, 1.665), Vector3(-0.985, 0.485, 1.665),
-		Vector3(0.945, 0.485, -1.2725), Vector3(-0.945, 0.485, -1.2725)]
-const WB := 2.9375                                # wheelbase
-const TRACK := 1.97
+const HUBS := [Vector3(0.943, 0.457, 1.66), Vector3(-0.943, 0.457, 1.66),
+		Vector3(0.943, 0.457, -1.276), Vector3(-0.943, 0.457, -1.276)]
+const WB := 2.936                                 # wheelbase
+const TRACK := 1.886
 
 # suspension, per axle [front, rear]. ext = how far the wheel hangs below its rest place (+ = droop)
 const K := [60700.0, 45800.0]          # spring rate N/m (about 1.5 Hz: soft off-road springs)
@@ -40,7 +40,7 @@ const K_ARB := [32000.0, 14000.0]      # anti-roll bars N/m of left-right differ
 const H_PITCH := [0.30, 0.42]          # front IFS anti-dive, rear leaf-spring anti-squat
 const H_ROLL := [0.18, 0.55]           # front independent, rear solid axle
 const DROOP := 0.22
-const BUMP := -0.11                    # the tyre meets the wheel arch here
+const BUMP := -0.10                    # the tyre meets the wheel-well liner here
 const K_STOP := 400000.0
 
 # drivetrain (6.2 L V8 class: ~620 N·m, ~310 kW)
@@ -55,7 +55,9 @@ const BRAKE_T := [4200.0, 2600.0]      # max brake torque per wheel N·m
 const HAND_T := 9000.0
 const CDA := 1.53                      # drag area (Cd 0.45 x 3.4 m²)
 
-var terrain: Terrain
+var terrain                            # the ground (FloorGround)
+## furniture in the truck's space: [{xf: Transform3D box→space (unit cube ±1 scaled by half), half: Vector3}]
+var boxes: Array = []
 # body state (centre of mass)
 var p := Vector3.ZERO
 var b := Basis.IDENTITY
@@ -97,11 +99,11 @@ var _since_shift := 0.0
 var air := true
 var air_t := 0.0
 var landed := 0.0
-var scrape := 0.0                      # body touching the sand (0..1)
+var scrape := 0.0                      # body touching the ground (0..1)
 var events: Array[String] = []
 
 
-func _init(t: Terrain, at: Vector3, heading := 0.0) -> void:
+func _init(t, at: Vector3, heading := 0.0) -> void:
 	terrain = t
 	place(at, heading)
 
@@ -259,7 +261,7 @@ func _step(dt: float, gas: float, brake: float, steer_in: float) -> void:
 		var vc := v + w.cross(r)
 		var vx := vc.dot(fw)
 		var vy := vc.dot(lw)
-		var sf := terrain.soft_at(cpos[i].x, cpos[i].z)
+		var sf: float = terrain.soft_at(cpos[i].x, cpos[i].z)
 		soft[i] = sf
 		var mu := lerpf(0.95, 0.74, sf)        # gravel → soft dune sand
 		var crr := lerpf(0.02, 0.085, sf)      # rolling resistance (sand pushes back)
@@ -334,6 +336,7 @@ func _step(dt: float, gas: float, brake: float, steer_in: float) -> void:
 	if wl > 1e-6:
 		b = b.rotated(w / wl, wl * dt).orthonormalized()
 	_trees()
+	_boxes()
 	# air time and landings
 	if n_on == 0:
 		air_t += dt
@@ -496,7 +499,7 @@ func _drivetrain(dt: float, gas: float, brake: float, vl: float) -> void:
 				_since_shift = 0.0
 
 
-## The body itself on the sand: bumpers, sills, bed and roof corners (rolling over, high-centring).
+## The body itself on the ground: bumpers, sills, bed and roof corners (rolling over, high-centring).
 const BODY_PTS := [
 	Vector3(0.95, 0.72, 2.5), Vector3(-0.95, 0.72, 2.5), Vector3(0.95, 0.62, -2.55), Vector3(-0.95, 0.62, -2.55),
 	Vector3(0.9, 0.5, 0.2), Vector3(-0.9, 0.5, 0.2), Vector3(0.0, 0.45, 0.2),
@@ -510,10 +513,10 @@ func _body_contacts() -> Array:
 	var s := 0.0
 	for q in BODY_PTS:
 		var wp: Vector3 = p + b * (q - COM)
-		var gh := terrain.height_at(wp.x, wp.z)
+		var gh: float = terrain.height_at(wp.x, wp.z)
 		if wp.y > gh + 0.02:
 			continue
-		var n := terrain.normal_at(wp.x, wp.z)
+		var n: Vector3 = terrain.normal_at(wp.x, wp.z)
 		var depth := (gh - wp.y) * n.y
 		var r := wp - p
 		var vp := v + w.cross(r)
@@ -537,8 +540,8 @@ func _trees() -> void:
 		var c := p + b.z * (1.9 - k * 1.9)   # three circles along the truck
 		c.y = 0.0
 		for tr in terrain.trees:
-			var dx := c.x - tr.x
-			var dz := c.z - tr.y
+			var dx: float = c.x - tr.x
+			var dz: float = c.z - tr.y
 			var rr: float = tr.z + 1.05
 			if absf(dx) > rr or absf(dz) > rr:
 				continue
@@ -553,6 +556,58 @@ func _trees() -> void:
 					v -= nn * vn * 1.3
 					v *= 0.7
 					w *= 0.6
+
+
+## Furniture (oriented boxes): the body's corners and sides are kept out of them; a hit is an
+## impulse at the contact point (so a glancing blow turns the truck), restitution 0.25.
+const HIT_PTS := [
+	Vector3(0.98, 0.7, 2.52), Vector3(-0.98, 0.7, 2.52), Vector3(0.98, 0.7, -2.55), Vector3(-0.98, 0.7, -2.55),
+	Vector3(0.0, 0.7, 2.58), Vector3(0.0, 0.7, -2.6), Vector3(1.05, 0.9, 1.0), Vector3(-1.05, 0.9, 1.0),
+	Vector3(1.05, 0.9, -0.6), Vector3(-1.05, 0.9, -0.6), Vector3(1.0, 1.9, 0.3), Vector3(-1.0, 1.9, 0.3),
+	Vector3(1.0, 0.5, 1.66), Vector3(-1.0, 0.5, 1.66), Vector3(1.0, 0.5, -1.276), Vector3(-1.0, 0.5, -1.276)]
+
+
+func _boxes() -> void:
+	if boxes.is_empty():
+		return
+	var inv_i := b * Basis.from_scale(Vector3(1.0 / INERTIA.x, 1.0 / INERTIA.y, 1.0 / INERTIA.z)) * b.transposed()
+	for bx in boxes:
+		var xf: Transform3D = bx.xf
+		var half: Vector3 = bx.half
+		# quick reject: box centre far from the truck
+		if xf.origin.distance_to(p) > half.length() + 4.0:
+			continue
+		var ixf := xf.affine_inverse()
+		for q in HIT_PTS:
+			var wp: Vector3 = p + b * (q - COM)
+			var lp := ixf * wp
+			var d := half - lp.abs()
+			if d.x <= 0.0 or d.y <= 0.0 or d.z <= 0.0:
+				continue
+			# push out through the nearest side face (furniture is entered from the side)
+			var nl := Vector3(signf(lp.x), 0, 0) if d.x < d.z else Vector3(0, 0, signf(lp.z))
+			var depth := minf(d.x, d.z)
+			var n := (xf.basis * nl).normalized()
+			n.y = 0.0
+			if n.length() < 0.1:
+				continue
+			n = n.normalized()
+			p += n * depth
+			var r := wp - p
+			var vp := v + w.cross(r)
+			var vn := vp.dot(n)
+			if vn < 0.0:
+				if vn < -3.0:
+					events.append("crash")
+				var rn := r.cross(n)
+				var j := -(1.25) * vn / (1.0 / MASS + rn.dot(inv_i * rn))
+				var vt := vp - n * vn
+				var jt := Vector3.ZERO
+				if vt.length() > 0.01:
+					jt = -vt.normalized() * minf(0.4 * j, vt.length() * MASS * 0.3)
+				var imp := n * j + jt
+				v += imp / MASS
+				w += inv_i * r.cross(imp)
 
 
 ## Longitudinal tyre force. need = the force that would cancel the slip this step. The force

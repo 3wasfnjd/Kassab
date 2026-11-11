@@ -1,10 +1,11 @@
 extends Node
-## Headless checks of the GMC driving model on the desert ground (tools/run_tests.sh and CI).
-## Numbers are acceptance ranges for a lifted full-size pickup, not factory figures.
+## Headless checks of the GMC model file and its driving model on the room floor
+## (tools/run_tests.sh and CI). Numbers are acceptance ranges for a lifted full-size pickup on a
+## grippy floor, not factory figures.
 
 var fails := 0
 var lines: PackedStringArray = []
-var t: Terrain
+const DT := 1.0 / 90.0
 
 
 func check(ok: bool, what: String) -> void:
@@ -21,12 +22,11 @@ func info(what: String) -> void:
 
 
 func _ready() -> void:
-	t = Terrain.new()
 	_test_model()
 	_test_rest()
 	_test_accel_brake()
 	_test_drift()
-	_test_dunes()
+	_test_furniture()
 	_test_stability()
 	_test_timestep()
 	var rep := ""
@@ -41,34 +41,20 @@ func _ready() -> void:
 	get_tree().quit(1 if fails > 0 else 0)
 
 
-## A flat, open gravel spot with a long flat run ahead; returns [point, heading].
-func _flat() -> Array:
-	for r in range(0, 4000, 30):
-		for a in 16:
-			var p := Vector3(cos(a * 0.39) * r, 0, sin(a * 0.39) * r)
-			if t.dune_mask(p.x, p.z) > 0.01:
-				continue
-			for k in 16:
-				var hd := k * TAU / 16.0
-				var f := Vector3(sin(hd), 0, cos(hd))
-				var ok := true
-				var h0 := t.height_at(p.x, p.z)
-				for s in 30:
-					var q := p + f * (s * 8.0)
-					if t.dune_mask(q.x, q.z) > 0.02 or absf(t.height_at(q.x, q.z) - h0) > 2.5 or t.normal_at(q.x, q.z).y < 0.996:
-						ok = false
-						break
-					for tr in t.trees:
-						if Vector2(q.x - tr.x, q.z - tr.y).length() < tr.z + 4.0:
-							ok = false
-				if ok:
-					return [p, hd]
-	return [Vector3.ZERO, 0.0]
+func _truck() -> Truck:
+	return Truck.new(FloorGround.new(), Vector3.ZERO, 0.0)
 
 
-func _run(tr: Truck, sec: float, gas: float, brake: float, st: float, dt := 1.0 / 90.0) -> void:
+func _run(tr: Truck, sec: float, gas: float, brake: float, st: float, dt := DT) -> void:
 	for i in int(sec / dt):
 		tr.update(dt, gas, brake, st)
+
+
+func _to_speed(tr: Truck, kmh: float) -> void:
+	for i in 3000:
+		if tr.speed() * 3.6 >= kmh:
+			return
+		tr.update(DT, 1.0, 0.0, 0.0)
 
 
 func _test_model() -> void:
@@ -84,158 +70,140 @@ func _test_model() -> void:
 		var n: Node3D = s.find_child(names[i], true, false)
 		if n == null or n.position.distance_to(Truck.HUBS[i]) > 0.002:
 			ok = false
+	check(ok, "wheel nodes in the GLB sit exactly at Truck.HUBS")
+	# wheels are straight and round: each wheel mesh is symmetric about its hub (no steered or
+	# torn source tyre left): its bounds are centred on the hub and as tall as they are long
+	var round_ok := true
+	for i in 4:
+		var mi: MeshInstance3D = s.find_child(names[i], true, false)
+		var bb := mi.mesh.get_aabb()
+		var c := bb.get_center()
+		if absf(c.y) > 0.01 or absf(c.z) > 0.01 or absf(bb.size.y - bb.size.z) > 0.01 or absf(bb.size.y * 0.5 - Truck.R) > 0.01:
+			round_ok = false
+	check(round_ok, "each wheel is round, straight and centred on its hub (radius %.3f m)" % Truck.R)
 	for mi in s.find_children("*", "MeshInstance3D", true, false):
 		var m: Mesh = mi.mesh
 		for si in m.get_surface_count():
 			tris += m.surface_get_array_index_len(si) / 3
-	check(ok, "wheel nodes in the GLB sit exactly at Truck.HUBS")
 	check(s.find_child("Body", true, false) != null, "body node present")
 	check(tris > 200000 and tris < 300000, "model detail %d triangles (from 511k source)" % tris)
 	s.free()
 
 
 func _test_rest() -> void:
-	var f := _flat()
-	var tr := Truck.new(t, f[0], f[1])
+	var tr := _truck()
 	_run(tr, 4.0, 0, 0, 0)
 	var all_on: bool = tr.contact[0] and tr.contact[1] and tr.contact[2] and tr.contact[3]
-	check(all_on, "standing: all four tyres on the ground")
-	check(tr.speed() < 0.05, "standing: settles (%.3f m/s)" % tr.speed())
+	check(all_on, "standing: all four tyres on the floor")
+	check(tr.speed() < 0.02, "standing: settles (%.3f m/s)" % tr.speed())
 	var e_max := 0.0
 	for i in 4:
 		e_max = maxf(e_max, absf(tr.ext[i]))
-	check(e_max < 0.05, "standing: ride height as modelled (suspension off rest by %.3f m)" % e_max)
-	var g := t.height_at(tr.p.x, tr.p.z)
-	check(absf(tr.model_xf().origin.y - g) < 0.08, "standing: truck on the ground (%.3f m)" % (tr.model_xf().origin.y - g))
-	var drift := tr.p
+	check(e_max < 0.03, "standing: ride height as modelled (suspension off rest by %.3f m)" % e_max)
+	check(absf(tr.model_xf().origin.y) < 0.03, "standing: tyres on the floor, not in it (%.3f m)" % tr.model_xf().origin.y)
+	var p0 := tr.p
 	_run(tr, 3.0, 0, 0, 0)
-	check(drift.distance_to(tr.p) < 0.02, "standing: does not creep (%.3f m in 3 s)" % drift.distance_to(tr.p))
+	check(p0.distance_to(tr.p) < 0.01, "standing: does not creep (%.3f m in 3 s)" % p0.distance_to(tr.p))
 
 
 func _test_accel_brake() -> void:
-	# straight-line times on an endless flat gravel plate
 	for awd in [false, true]:
-		var tp := Truck.new(load("res://tests/flat_terrain.gd").new(), Vector3.ZERO, 0.0)
+		var tp := _truck()
 		tp.awd = awd
 		_run(tp, 1.0, 0, 0, 0)
 		var t100 := 0.0
 		while tp.speed() < 100.0 / 3.6 and t100 < 20.0:
-			tp.update(1.0 / 90.0, 1.0, 0.0, 0.0)
-			t100 += 1.0 / 90.0
+			tp.update(DT, 1.0, 0.0, 0.0)
+			t100 += DT
 		var lim := 7.5 if awd else 10.5
-		check(t100 > 5.0 and t100 < lim, "0-100 km/h in %.1f s (%s, gravel, traction control on)" % [t100, "4x4" if awd else "rear-drive"])
-	# braking and backing up on the real ground
-	var f := _flat()
-	var tr := Truck.new(t, f[0], f[1])
-	_run(tr, 1.0, 0, 0, 0)
-	var tt := 0.0
-	var dt := 1.0 / 90.0
-	while tr.speed() < 100.0 / 3.6 and tt < 20.0:
-		tr.update(dt, 1.0, 0.0, 0.0)
-		tt += dt
+		check(t100 > 5.0 and t100 < lim, "0-100 km/h in %.1f s (%s, traction control on)" % [t100, "4x4" if awd else "rear-drive"])
+	var tr := _truck()
+	_to_speed(tr, 100.0)
+	var h0 := tr.heading()
 	var p0 := tr.p
-	tt = 0.0
+	var tt := 0.0
 	while tr.speed() > 0.3 and tt < 15.0:
-		tr.update(dt, 0.0, 1.0, 0.0)
-		tt += dt
+		tr.update(DT, 0.0, 1.0, 0.0)
+		tt += DT
 	var d := p0.distance_to(tr.p)
-	check(d > 33.0 and d < 65.0, "100-0 km/h braking distance %.1f m (ABS, gravel)" % d)
-	# keeps straight under full braking
-	check(absf(rad_to_deg(wrapf(tr.heading() - f[1], -PI, PI))) < 15.0, "brakes without spinning on rolling ground (heading change %.1f°, cross-slopes)" % rad_to_deg(wrapf(tr.heading() - f[1], -PI, PI)))
-	var tb := Truck.new(load("res://tests/flat_terrain.gd").new(), Vector3.ZERO, 0.0)
-	for i in 2000:
-		if tb.speed() > 100.0 / 3.6: break
-		tb.update(dt, 1.0, 0.0, 0.0)
-	var hb := tb.heading()
-	var pb := tb.p
-	_run(tb, 6.0, 0.0, 1.0, 0.0)
-	check(absf(rad_to_deg(wrapf(tb.heading() - hb, -PI, PI))) < 1.0, "brakes dead straight on a flat plate (%.2f°)" % rad_to_deg(wrapf(tb.heading() - hb, -PI, PI)))
-	info("100-0 on the flat plate: %.1f m" % pb.distance_to(tb.p))
-	# reverse
+	check(d > 33.0 and d < 65.0, "100-0 km/h braking distance %.1f m (ABS)" % d)
+	check(absf(rad_to_deg(wrapf(tr.heading() - h0, -PI, PI))) < 1.0, "brakes dead straight (%.2f°)" % rad_to_deg(wrapf(tr.heading() - h0, -PI, PI)))
 	_run(tr, 2.5, 0.0, 1.0, 0.0)
 	check(tr.gear == -1 and tr.v_long() < -1.5, "left trigger held when stopped backs up (%.1f m/s)" % tr.v_long())
-	# top speed (on an endless flat plate)
-	var tr2 := Truck.new(load("res://tests/flat_terrain.gd").new(), Vector3.ZERO, 0.0)
-	_run(tr2, 22.0, 1.0, 0.0, 0.0)
-	check(tr2.speed() * 3.6 > 150.0 and tr2.speed() * 3.6 < 182.0, "flat out for 22 s on a flat plate: %d km/h, gear %d (governed at 180)" % [int(tr2.speed() * 3.6), tr2.gear])
+	var t2 := _truck()
+	_run(t2, 22.0, 1.0, 0.0, 0.0)
+	check(t2.speed() * 3.6 > 150.0 and t2.speed() * 3.6 < 182.0, "flat out for 22 s: %d km/h, gear %d (governed at 180)" % [int(t2.speed() * 3.6), t2.gear])
 
 
 func _test_drift() -> void:
-	var f := _flat()
-	var dt := 1.0 / 90.0
-	# steady cornering at 50 km/h: grips (small slide)
-	var tr := Truck.new(t, f[0], f[1])
-	for i in 2000:
-		if tr.speed() > 50.0 / 3.6: break
-		tr.update(dt, 1.0, 0.0, 0.0)
+	var tr := _truck()
+	_to_speed(tr, 50.0)
 	var max_slide := 0.0
 	for i in 90:
-		tr.update(dt, 0.25, 0.0, 0.35)
+		tr.update(DT, 0.25, 0.0, 0.35)
 		max_slide = maxf(max_slide, tr.drift_deg())
 	check(max_slide < 8.0, "gentle turn at 50 km/h grips (slide %.1f°)" % max_slide)
-	# handbrake turn at 60 km/h: the tail comes round
-	tr = Truck.new(t, f[0], f[1])
-	for i in 2000:
-		if tr.speed() > 60.0 / 3.6: break
-		tr.update(dt, 1.0, 0.0, 0.0)
+	tr = _truck()
+	_to_speed(tr, 60.0)
 	var h0 := tr.heading()
 	tr.hand = true
 	var peak := 0.0
 	for i in 110:
-		tr.update(dt, 0.0, 0.0, 1.0)
+		tr.update(DT, 0.0, 0.0, 1.0)
 		peak = maxf(peak, tr.drift_deg())
 	tr.hand = false
 	var turned := absf(rad_to_deg(wrapf(tr.heading() - h0, -PI, PI)))
 	check(peak > 20.0, "handbrake + full lock at 60 km/h: slides %.0f°" % peak)
 	check(turned > 60.0, "handbrake turn swings the truck %.0f°" % turned)
-	# power slide with traction control off (drift mode): rear-drive, full throttle and lock
-	tr = Truck.new(t, f[0], f[1])
+	# drift mode: traction control off, power on with full lock
+	tr = _truck()
 	tr.tcs = false
-	for i in 2000:
-		if tr.speed() > 35.0 / 3.6: break
-		tr.update(dt, 1.0, 0.0, 0.0)
+	_to_speed(tr, 35.0)
 	var pk := 0.0
 	for i in 180:
-		tr.update(dt, 1.0, 0.0, -1.0)
+		tr.update(DT, 1.0, 0.0, -1.0)
 		pk = maxf(pk, tr.drift_deg())
-	info("power-on full lock from 35 km/h (rear-drive, gravel): slide %.0f°" % pk)
-	check(is_finite(tr.p.x) and tr.p.y > t.height_at(tr.p.x, tr.p.z), "power slide stays on its wheels / finite")
+	check(pk > 15.0, "drift mode: power-on full lock from 35 km/h breaks the tail loose (%.0f°)" % pk)
+	check(tr.b.y.y > 0.8, "drift mode: stays on its wheels")
 
 
-func _test_dunes() -> void:
-	# head into the dune field flat out in 4x4 and count air time; nothing explodes
-	var dt := 1.0 / 90.0
-	var start := Vector3.ZERO
-	for r in range(0, 3000, 40):
-		var q := Vector3(r, 0, r * 0.3)
-		if t.dune_mask(q.x, q.z) > 0.9:
-			start = q
-			break
-	var tr := Truck.new(t, start, 0.42 + PI * 0.5)   # across the ridges
-	tr.awd = true
-	var air_max := 0.0
-	var hmax := -1e9
-	var hmin := 1e9
-	var landings := 0
-	for i in int(40.0 / dt):
-		tr.update(dt, 1.0, 0.0, sin(i * 0.004) * 0.3)
-		air_max = maxf(air_max, tr.air_t)
-		hmax = maxf(hmax, tr.p.y)
-		hmin = minf(hmin, tr.p.y)
-		landings += tr.events.count("land")
+## A sofa-sized box (in room metres it is whatever the scale makes it): driving into it stops the
+## truck at its face; a glancing hit turns it; nothing passes through.
+func _test_furniture() -> void:
+	var tr := _truck()
+	var bx := {xf = Transform3D(Basis.IDENTITY, Vector3(0, 3.0, 30.0)), half = Vector3(8.0, 3.0, 2.0)}
+	tr.boxes = [bx]
+	var crashed := false
+	for i in int(6.0 / DT):
+		tr.update(DT, 1.0, 0.0, 0.0)
+		if tr.events.has("crash"):
+			crashed = true
 		tr.events.clear()
-	var up := tr.b.y.y
-	info("40 s in the dunes (4x4): %d m travelled height range, longest air %.2f s, %d landings, %d km/h, upright %.2f" % [int(hmax - hmin), air_max, landings, int(tr.speed() * 3.6), up])
-	check(is_finite(tr.p.x) and is_finite(tr.v.length()) and tr.v.length() < 80.0, "dunes: state finite and sane")
-	check(tr.p.y - t.height_at(tr.p.x, tr.p.z) > -0.3, "dunes: never sinks through the sand")
-	check(hmax - hmin > 6.0, "dunes: climbs the dunes (height range %.1f m)" % (hmax - hmin))
+	var front: float = tr.p.z + (2.58 - Truck.COM.z)
+	check(front < 28.0 + 0.15, "drives into furniture and stops at its face (nose at %.2f, face at 28.00)" % front)
+	check(crashed, "hitting furniture is a crash event (sound + rumble)")
+	# glancing: aim at the box's corner
+	var t2 := _truck()
+	t2.place(Vector3(7.5, 0, 0), 0.0)
+	t2.boxes = [bx]
+	_run(t2, 6.0, 0.8, 0.0, 0.0)
+	var inside := false
+	var ix: Transform3D = bx.xf.affine_inverse()
+	for q in Truck.HIT_PTS:
+		var lp: Vector3 = (ix * (t2.p + t2.b * (q - Truck.COM))).abs()
+		if lp.x < bx.half.x - 0.05 and lp.y < bx.half.y - 0.05 and lp.z < bx.half.z - 0.05:
+			inside = true
+	check(not inside, "glancing hit: no part of the truck ends up inside the furniture")
+	check(is_finite(t2.p.x) and t2.b.y.y > 0.7, "glancing hit: truck stays sane and upright")
 
 
 func _test_stability() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
 	for dt in [1.0 / 72.0, 1.0 / 90.0, 1.0 / 120.0]:
-		var tr := Truck.new(t, Vector3(300, 0, -200), 1.0)
+		var tr := _truck()
+		tr.boxes = [{xf = Transform3D(Basis(Vector3.UP, 0.4), Vector3(20, 2, 25)), half = Vector3(6, 2, 3)},
+				{xf = Transform3D(Basis.IDENTITY, Vector3(-30, 3, -10)), half = Vector3(4, 3, 9)}]
 		var ok := true
 		var gas := 0.0
 		var st := 0.0
@@ -249,6 +217,7 @@ func _test_stability() -> void:
 				br = 1.0 if rng.randf() < 0.1 else 0.0
 				tr.hand = rng.randf() < 0.15
 				tr.awd = rng.randf() < 0.5
+				tr.tcs = rng.randf() < 0.5
 				if tr.b.y.y < 0.3:
 					tr.place(tr.p, tr.heading())
 			tr.update(dt, gas, br, st)
@@ -256,18 +225,17 @@ func _test_stability() -> void:
 			if not (is_finite(tr.p.x) and is_finite(tr.p.y) and is_finite(tr.v.x) and tr.v.length() < 90.0):
 				ok = false
 				break
-			if tr.p.y < t.height_at(tr.p.x, tr.p.z) - 0.5:
+			if tr.p.y < -0.3:
 				ok = false
 				break
 		var us := float(Time.get_ticks_usec() - t0) / steps
-		check(ok, "60 s random driving at %d fps: stays finite and above the sand" % int(round(1.0 / dt)))
+		check(ok, "60 s random driving (with furniture) at %d fps: stays finite and above the floor" % int(round(1.0 / dt)))
 		info("cost %.0f µs per frame at %d fps (desktop, headless)" % [us, int(round(1.0 / dt))])
 
 
 func _test_timestep() -> void:
-	var f := _flat()
-	var a := Truck.new(t, f[0], f[1])
-	var b := Truck.new(t, f[0], f[1])
+	var a := _truck()
+	var b := _truck()
 	_run(a, 6.0, 0.8, 0.0, 0.3, 1.0 / 72.0)
 	_run(b, 6.0, 0.8, 0.0, 0.3, 1.0 / 90.0)
 	check(a.p.distance_to(b.p) < 0.6, "same drive at 72 and 90 fps ends %.2f m apart" % a.p.distance_to(b.p))
