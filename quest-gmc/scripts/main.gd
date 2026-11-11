@@ -6,10 +6,11 @@ extends Node3D
 ##
 ## Controls (Quest Touch):
 ##   right trigger gas · left trigger brake, and reverse once stopped · left stick steer
-##   right grip handbrake · Y 4x4 · X traction control (off = drift mode) · B back on its wheels
+##   right grip handbrake · Y 4x4 (pulls away harder) · X wheel-well lights · B straighten up
 ##   A bring the truck in front of you · right stick up/down: bigger / smaller · left grip horn
-##   left stick click: wheel-well lights on/off
-## Desktop (development): W/S gas/brake · A/D steer · Space handbrake · F 4x4 · T traction ·
+##   left stick click: wheel-well lights too
+## Driving: the same physics as Hajwala's free room mode (scripts/truck.gd).
+## Desktop (development): W/S gas/brake · A/D steer · Space handbrake · F 4x4 ·
 ##   R reset · G bring back · Q/E size · H horn · L wheel-well lights.
 
 const SKIP_LABELS := ["floor", "ceiling", "wall_face", "invisible_wall_face", "global_mesh",
@@ -270,7 +271,6 @@ func _read_input() -> Dictionary:
 	var hand := false
 	var horn := false
 	var b_awd := false
-	var b_tcs := false
 	var b_reset := false
 	var b_home := false
 	var b_lights := false
@@ -289,9 +289,8 @@ func _read_input() -> Dictionary:
 		horn = left.get_float("grip") > 0.6
 		b_home = right.is_button_pressed("ax_button")
 		b_reset = right.is_button_pressed("by_button")
-		b_tcs = left.is_button_pressed("ax_button")
 		b_awd = left.is_button_pressed("by_button")
-		b_lights = left.is_button_pressed("primary_click")
+		b_lights = left.is_button_pressed("primary_click") or left.is_button_pressed("ax_button")
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
 		gas = 1.0
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
@@ -303,7 +302,6 @@ func _read_input() -> Dictionary:
 	hand = hand or Input.is_key_pressed(KEY_SPACE)
 	horn = horn or Input.is_key_pressed(KEY_H)
 	b_awd = b_awd or Input.is_key_pressed(KEY_F)
-	b_tcs = b_tcs or Input.is_key_pressed(KEY_T)
 	b_reset = b_reset or Input.is_key_pressed(KEY_R)
 	b_home = b_home or Input.is_key_pressed(KEY_G)
 	b_lights = b_lights or Input.is_key_pressed(KEY_L)
@@ -316,7 +314,7 @@ func _read_input() -> Dictionary:
 		st = float(shot.get("steer", "0"))
 		hand = shot.has("hand") and _shot_t > float(shot.get("hand", "0")) and _shot_t < float(shot.get("hand", "0")) + float(shot.get("hold", "9"))
 	return {gas = gas, brake = brake, steer = st, hand = hand, horn = horn, dz = dz,
-		awd = _pressed("awd", b_awd), tcs = _pressed("tcs", b_tcs), reset = _pressed("reset", b_reset), home = _pressed("home", b_home), lights = _pressed("lights", b_lights)}
+		awd = _pressed("awd", b_awd), reset = _pressed("reset", b_reset), home = _pressed("home", b_home), lights = _pressed("lights", b_lights)}
 
 
 # ---------------------------------------------------------------- frame
@@ -325,9 +323,6 @@ func _process(dt: float) -> void:
 	if inp.awd:
 		truck.awd = not truck.awd
 		_pulse(left, 0.5 if truck.awd else 0.25, 0.08)
-	if inp.tcs:
-		truck.tcs = not truck.tcs
-		_pulse(left, 0.25 if truck.tcs else 0.5, 0.08)
 	if inp.reset:
 		truck.place(truck.p, truck.heading())
 		_pulse(right, 0.4, 0.06)

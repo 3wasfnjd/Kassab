@@ -11,6 +11,7 @@ var brake_glow: Array[MeshInstance3D] = []
 var _glow_mat: StandardMaterial3D
 var well_lights: Array[Node3D] = []
 var lights_on := true
+var rig: Node3D                 # the body and everything bolted to it (leans and pitches, Hajwala style)
 
 
 func _init() -> void:
@@ -22,6 +23,16 @@ func _init() -> void:
 		wheels.append(w)
 		rest.append(w.position)
 	body = s.find_child("Body", true, false)
+	rig = Node3D.new()
+	rig.name = "BodyRig"
+	add_child(rig)
+	for nm in ["Body", "WellLiner"]:
+		var part: Node3D = s.find_child(nm, true, false)
+		if part:
+			var xf := part.transform
+			part.get_parent().remove_child(part)
+			rig.add_child(part)
+			part.transform = xf
 	# paint: the source texture already carries its shading; a little sheen reads as car paint
 	for mi in s.find_children("*", "MeshInstance3D", true, false):
 		var m := (mi as MeshInstance3D).get_active_material(0)
@@ -47,12 +58,37 @@ func _init() -> void:
 		g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		g.position = Vector3(0.955 * sx, 1.225, -2.47)   # over the tail lamps (from the texture)
 		g.rotation.y = PI
-		add_child(g)
+		rig.add_child(g)
 		brake_glow.append(g)
 
 
 	_bed_cover()
 	_well_leds()
+	_plates()
+
+
+## Saudi plates — the same plate as the GMC in the Kassab web game (index.html saudiPlate(),
+## PLATE_NUM.gmc: ٥٤٥٢ ب ك ك / 5452 B K K), rendered from that very code into
+## textures/plate_gmc.png. Real size 335 × 155 mm.
+func _plates() -> void:
+	var tex: Texture2D = load("res://textures/plate_gmc.png")
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = tex
+	m.roughness = 0.45
+	m.emission_enabled = true
+	m.emission_texture = tex
+	m.emission_energy_multiplier = 0.25      # (as in the web game: a faint self-light keeps it readable)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	for spot in [[Vector3(0, 0.60, 2.505), 0.0], [Vector3(0, 0.78, -2.40), PI]]:
+		var q := QuadMesh.new()
+		q.size = Vector2(0.335, 0.155)
+		var pl := MeshInstance3D.new()
+		pl.mesh = q
+		pl.material_override = m
+		pl.position = spot[0]
+		pl.rotation.y = spot[1]
+		pl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		rig.add_child(pl)
 
 
 ## Hard folding bed cover (tri-fold style, like the owner's photo): four matte black panels lying
@@ -69,7 +105,7 @@ func _bed_cover() -> void:
 	var blen := z0 - z1
 	cover.position = Vector3(0, (y0 + y1) * 0.5 + 0.012, (z0 + z1) * 0.5)
 	cover.rotation.x = atan2(y1 - y0, blen)           # follows the rails' slight rise to the back
-	add_child(cover)
+	rig.add_child(cover)
 	var panel_m := StandardMaterial3D.new()
 	panel_m.albedo_color = Color(0.045, 0.045, 0.05)
 	panel_m.roughness = 0.5
@@ -126,7 +162,7 @@ func _well_leds() -> void:
 		var sx := signf(hub.x)
 		var holder := Node3D.new()
 		holder.position = Vector3(0.985 * sx, hub.y, hub.z)
-		add_child(holder)
+		rig.add_child(holder)
 		var st := SurfaceTool.new()
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
 		var seg := 28
@@ -190,8 +226,13 @@ func set_lights(on: bool) -> void:
 
 func apply(tr: Truck, braking: bool) -> void:
 	transform = tr.model_xf(tr.alpha())
+	# Hajwala updateBody: the body pitches with acceleration and leans into turns, about a point
+	# at about the truck's mid height
+	var piv := Vector3(0, Truck.BODY_PIVOT, 0.2)
+	var rot := Basis.from_euler(Vector3(tr.body_pitch, 0, tr.body_roll), EULER_ORDER_YXZ)
+	rig.transform = Transform3D(Basis.IDENTITY, piv) * Transform3D(rot, Vector3.ZERO) * Transform3D(Basis.IDENTITY, -piv)
 	for i in 4:
 		var w := wheels[i]
-		w.position = rest[i] - Vector3.UP * clampf(tr.ext[i], Truck.BUMP, Truck.DROOP - 0.03)
+		w.position = rest[i]
 		w.basis = Basis(Vector3.UP, tr.angle[i]) * Basis(Vector3.RIGHT, tr.spin[i])
 	_glow_mat.albedo_color.a = move_toward(_glow_mat.albedo_color.a, 0.85 if braking else 0.0, 0.2)

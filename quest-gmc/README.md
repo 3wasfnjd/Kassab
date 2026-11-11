@@ -8,7 +8,7 @@ headset has them (`OpenXRFbSceneManager`, permission `com.oculus.permission.USE_
 doors and windows are not. No text on screen; toggles answer with a controller buzz.
 
 Mods (from the owner's photos): a hard folding bed cover (four black panels flush on the rails)
-and warm LED strips under each fender lip, and a supercharger tune (+40 % torque, 230 km/h).
+and warm LED strips under each fender lip.
 
 Godot 4.6.3 (GL Compatibility), OpenXR Vendors 5.1.0, package `com.abodengames.kassab.gmcar`
 (installs next to the other Kassab Quest app). The Aboden Games logo appears once, as the Quest
@@ -22,22 +22,25 @@ system splash (`vr_splash.png`); there is no second logo card in the app.
 | Left trigger | brake; held when stopped: reverse |
 | Left stick (or right stick sideways) | steer |
 | Right grip | handbrake (locks the rear wheels: drift) |
-| Y | 4x4 on/off |
-| X | traction control on/off (off = drift mode) |
-| B | put the truck back on its wheels |
+| Y | 4x4 on/off (pulls away harder) |
+| X | wheel-well LED lights on/off |
+| B | straighten the truck up where it stands |
 | A | bring the truck in front of you |
 | Right stick up/down | bigger / smaller (1/40 … 1/5 scale; starts at 1/14 = 36 cm long) |
 | Left grip | horn |
-| Left stick click | wheel-well LED lights on/off |
+| Left stick click | wheel-well LED lights on/off (same as X) |
 
-## Driving model (`scripts/truck.gd`)
+## Driving (`scripts/truck.gd`)
 
-A rigid body with all six degrees of freedom on the floor (`floor_ground.gd`), fixed 180 Hz
-steps: four spring-damper wheels with anti-roll bars and suspension geometry (anti-squat/anti-dive,
-roll centres), tyres with combined-slip grip curves inside a friction circle, a supercharged V8 torque curve (~870 N·m)
-with torque converter and 6-speed automatic, open diffs with brake traction control, a rear
-auto-locker below 32 km/h, 4x4 transfer case, ABS, handbrake, body contacts (roll-overs) and
-furniture boxes (impulse at the contact point). Numbers are typical for the class, not factory data.
+The same physics as Hajwala's free room mode (Kenney's Starter Kit Racing model as ported in
+3wasfnjd/hajwala `js/Vehicle.js` + `js/Physics.js`): an invisible ball rolls on the floor and
+carries the truck; the throttle eases a target speed in and spins the ball, the steering turns
+the truck itself, and the ball's own momentum makes the slides and drifts. Hajwala's numbers are
+used unchanged in Hajwala's units and scaled up to the 5 m GMC, ×1.5 faster (asked for). The body
+pitches and leans like Hajwala's. Furniture boxes push the ball back (restitution 0.2).
+
+Plates: the same Saudi plate as the GMC in the Kassab web game (`saudiPlate()` in `index.html`,
+٥٤٥٢ ب ك ك / 5452 B K K), rendered from that code into `textures/plate_gmc.png`.
 
 ## Build and tests
 
@@ -46,4 +49,5 @@ furniture boxes (impulse at the contact point). Numbers are typical for the clas
   `https://github.com/3wasfnjd/Kassab/releases/download/gmc-ar-latest/kassab-gmc-ar.apk`
   (signed with the public TEST key — sideload only).
 - `tools/run_tests.sh` — headless checks: model file (wheels round, straight, on their hubs),
-  standing, 0-100, braking, drift, furniture hits, stability at 72/90/120 fps, frame-rate independence.
+  bed cover, LEDs and plate, standing, pull-away, top speed, braking, reverse, slides and handbrake
+  turns, furniture hits, stability at 72/90/120 fps, frame-rate independence.
